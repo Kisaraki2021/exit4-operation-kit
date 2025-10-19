@@ -21,10 +21,22 @@ class WebSocketClient {
 
         this.ws.onmessage = (event) => {
             try {
-                const data = JSON.parse(event.data);
-                this.notifyMessage(data);
+                // Blobの場合はテキストに変換
+                if (event.data instanceof Blob) {
+                    event.data.text().then(text => {
+                        try {
+                            const data = JSON.parse(text);
+                            this.notifyMessage(data);
+                        } catch (error) {
+                            console.error('Blob内のJSON解析エラー:', error, 'データ:', text);
+                        }
+                    });
+                } else {
+                    const data = JSON.parse(event.data);
+                    this.notifyMessage(data);
+                }
             } catch (error) {
-                console.error('メッセージ解析エラー:', error);
+                console.error('メッセージ解析エラー:', error, 'データ型:', typeof event.data, 'データ:', event.data);
             }
         };
 

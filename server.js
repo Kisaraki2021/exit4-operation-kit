@@ -114,7 +114,7 @@ startTimer();
 // WebSocket接続
 wss.on('connection', (ws) => {
     console.log('新しいクライアントが接続しました');
-    
+
     // クライアント識別用のID
     ws.clientId = Math.random().toString(36).substr(2, 9);
 
@@ -174,10 +174,11 @@ wss.on('connection', (ws) => {
                 case 'webrtc-answer':
                 case 'webrtc-ice-candidate':
                     console.log(`WebRTCシグナリング: ${data.type} from ${ws.clientId}`);
-                    // 送信者以外の全クライアントに転送
+                    // 送信者以外の全クライアントに転送（JSONとして再送信）
+                    const forwardMessage = JSON.stringify(data);
                     wss.clients.forEach((client) => {
                         if (client !== ws && client.readyState === WebSocket.OPEN) {
-                            client.send(message);
+                            client.send(forwardMessage);
                         }
                     });
                     break;
