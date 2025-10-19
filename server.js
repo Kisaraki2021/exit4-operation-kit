@@ -207,7 +207,7 @@ wss.on('connection', (ws) => {
                     const requestedStreamId = data.streamId;
                     const receiverId = data.receiverId;
                     console.log(`接続要求: streamId=${requestedStreamId}, receiverId=${receiverId}`);
-                    
+
                     // 該当する送信側に通知
                     wss.clients.forEach((client) => {
                         if (client.role === 'sender' && client.streamId === requestedStreamId && client.readyState === WebSocket.OPEN) {
@@ -226,7 +226,7 @@ wss.on('connection', (ws) => {
                     const targetStreamId = data.streamId;
                     const targetReceiverId = data.receiverId;
                     console.log(`WebRTCシグナリング: ${data.type} streamId=${targetStreamId} receiverId=${targetReceiverId} from ${ws.clientId} (${ws.role})`);
-                    
+
                     // ストリームIDに基づいて適切なクライアントに転送
                     const forwardMessage = JSON.stringify(data);
                     wss.clients.forEach((client) => {

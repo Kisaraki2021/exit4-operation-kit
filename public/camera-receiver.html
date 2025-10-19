@@ -146,7 +146,7 @@
         async function connectToSender(streamId) {
             try {
                 console.log(`送信側に接続を要求 (${streamId})`);
-                
+
                 // サーバーに接続要求を送信
                 wsClient.send({
                     type: 'request-connection',
@@ -257,15 +257,15 @@
                     }
                     removeStream(streamId);
                 }
-                        peerConnections[streamId].close();
-                        delete peerConnections[streamId];
-                    }
-                    removeStream(streamId);
-                }
-            } catch (error) {
-                console.error('WebRTC接続エラー:', error);
-                console.error('エラー詳細:', error.stack);
+                peerConnections[streamId].close();
+                delete peerConnections[streamId];
             }
+                    removeStream(streamId);
+        }
+            } catch (error) {
+            console.error('WebRTC接続エラー:', error);
+            console.error('エラー詳細:', error.stack);
+        }
         });
 
         updateStreamCount();
