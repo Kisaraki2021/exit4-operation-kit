@@ -74,7 +74,7 @@
         const streamCount = document.getElementById('stream-count');
         const noStreamMessage = document.getElementById('no-stream-message');
 
-        let peerConnections = [];
+        let peerConnection = null;
         let streamCounter = 0;
 
         // 接続状態の表示
@@ -90,6 +90,8 @@
 
         // リモートストリームを表示
         function addRemoteStream(stream) {
+            // 既存のビデオを削除
+            videoGrid.innerHTML = '';
             streamCounter++;
 
             const videoItem = document.createElement('div');
@@ -98,7 +100,7 @@
 
             const label = document.createElement('div');
             label.className = 'video-label';
-            label.textContent = `カメラ ${streamCounter}`;
+            label.textContent = `カメラ映像`;
 
             const video = document.createElement('video');
             video.autoplay = true;
@@ -110,6 +112,7 @@
             videoGrid.appendChild(videoItem);
 
             updateStreamCount();
+            console.log('リモートストリームを表示しました');
         }
 
         // ストリーム数を更新
@@ -126,40 +129,51 @@
 
         // WebRTC接続を処理
         wsClient.onMessage(async (data) => {
-            if (data.type === 'webrtc-offer') {
-                try {
-                    const peerConnection = new RTCPeerConnection({
+            try {
+                if (data.type === 'webrtc-offer') {
+                    console.log('Offerを受信');
+
+                    // 既存の接続があれば閉じる
+                    if (peerConnection) {
+                        peerConnection.close();
+                    }
+
+                    peerConnection = new RTCPeerConnection({
                         iceServers: [
-                            { urls: 'stun:stun.l.google.com:19302' }
+                            { urls: 'stun:stun.l.google.com:19302' },
+                            { urls: 'stun:stun1.l.google.com:19302' }
                         ]
                     });
 
                     // リモートストリームを受信
                     peerConnection.ontrack = (event) => {
-                        addRemoteStream(event.streams[0]);
+                        console.log('トラックを受信:', event.streams[0]);
+                        if (event.streams && event.streams[0]) {
+                            addRemoteStream(event.streams[0]);
+                        }
                     };
 
                     // ICE候補を送信
                     peerConnection.onicecandidate = (event) => {
                         if (event.candidate) {
+                            console.log('受信側ICE候補を送信');
                             wsClient.send({
                                 type: 'webrtc-ice-candidate',
-                                candidate: event.candidate
+                                candidate: event.candidate,
+                                from: 'receiver'
                             });
                         }
                     };
 
                     // 接続状態の監視
                     peerConnection.onconnectionstatechange = () => {
-                        console.log('接続状態:', peerConnection.connectionState);
+                        console.log('受信側接続状態:', peerConnection.connectionState);
                         if (peerConnection.connectionState === 'disconnected' ||
                             peerConnection.connectionState === 'failed' ||
                             peerConnection.connectionState === 'closed') {
-                            // 切断された場合の処理
-                            const index = peerConnections.indexOf(peerConnection);
-                            if (index > -1) {
-                                peerConnections.splice(index, 1);
-                            }
+                            console.log('接続が切断されました');
+                            videoGrid.innerHTML = '';
+                            updateStreamCount();
                         }
                     };
 
@@ -168,25 +182,21 @@
                     const answer = await peerConnection.createAnswer();
                     await peerConnection.setLocalDescription(answer);
 
+                    console.log('Answerを送信');
                     // Answerを送信
                     wsClient.send({
                         type: 'webrtc-answer',
-                        answer: answer
+                        answer: answer,
+                        from: 'receiver'
                     });
 
-                    peerConnections.push(peerConnection);
-                } catch (error) {
-                    console.error('WebRTC接続エラー:', error);
+                } else if (data.type === 'webrtc-ice-candidate' && data.from === 'sender' && peerConnection) {
+                    console.log('送信側からICE候補を受信');
+                    await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
                 }
-            } else if (data.type === 'webrtc-ice-candidate') {
-                // ICE候補を追加
-                for (const pc of peerConnections) {
-                    try {
-                        await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
-                    } catch (error) {
-                        console.error('ICE候補追加エラー:', error);
-                    }
-                }
+            } catch (error) {
+                console.error('WebRTC接続エラー:', error);
+                alert('WebRTC接続に失敗しました: ' + error.message);
             }
         });
 

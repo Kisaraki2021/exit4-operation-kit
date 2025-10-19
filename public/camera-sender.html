@@ -65,7 +65,7 @@
         const cameraType = document.getElementById('camera-type');
 
         let localStream = null;
-        let peerConnections = [];
+        let peerConnection = null;
         let currentFacingMode = 'user'; // 'user' = インカメラ, 'environment' = アウトカメラ
 
         // 接続状態の表示
@@ -119,9 +119,11 @@
                 localVideo.srcObject = null;
             }
 
-            // すべてのピア接続を閉じる
-            peerConnections.forEach(pc => pc.close());
-            peerConnections = [];
+            // ピア接続を閉じる
+            if (peerConnection) {
+                peerConnection.close();
+                peerConnection = null;
+            }
 
             streamState.textContent = '停止中';
             streamState.style.color = '#999';
@@ -142,9 +144,15 @@
         // WebRTC接続を開始
         async function startWebRTC() {
             try {
-                const peerConnection = new RTCPeerConnection({
+                // 既存の接続があれば閉じる
+                if (peerConnection) {
+                    peerConnection.close();
+                }
+
+                peerConnection = new RTCPeerConnection({
                     iceServers: [
-                        { urls: 'stun:stun.l.google.com:19302' }
+                        { urls: 'stun:stun.l.google.com:19302' },
+                        { urls: 'stun:stun1.l.google.com:19302' }
                     ]
                 });
 
@@ -153,12 +161,19 @@
                     peerConnection.addTrack(track, localStream);
                 });
 
+                // 接続状態の監視
+                peerConnection.onconnectionstatechange = () => {
+                    console.log('送信側接続状態:', peerConnection.connectionState);
+                };
+
                 // ICE候補を送信
                 peerConnection.onicecandidate = (event) => {
                     if (event.candidate) {
+                        console.log('送信側ICE候補を送信');
                         wsClient.send({
                             type: 'webrtc-ice-candidate',
-                            candidate: event.candidate
+                            candidate: event.candidate,
+                            from: 'sender'
                         });
                     }
                 };
@@ -167,25 +182,31 @@
                 const offer = await peerConnection.createOffer();
                 await peerConnection.setLocalDescription(offer);
 
+                console.log('Offerを送信');
                 wsClient.send({
                     type: 'webrtc-offer',
-                    offer: offer
+                    offer: offer,
+                    from: 'sender'
                 });
 
-                peerConnections.push(peerConnection);
             } catch (error) {
                 console.error('WebRTC接続エラー:', error);
+                alert('WebRTC接続に失敗しました: ' + error.message);
             }
         }
 
         // WebRTCシグナリング
         wsClient.onMessage(async (data) => {
-            if (data.type === 'webrtc-answer' && peerConnections.length > 0) {
-                const pc = peerConnections[peerConnections.length - 1];
-                await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
-            } else if (data.type === 'webrtc-ice-candidate' && peerConnections.length > 0) {
-                const pc = peerConnections[peerConnections.length - 1];
-                await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+            try {
+                if (data.type === 'webrtc-answer' && peerConnection) {
+                    console.log('Answerを受信');
+                    await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+                } else if (data.type === 'webrtc-ice-candidate' && data.from === 'receiver' && peerConnection) {
+                    console.log('受信側からICE候補を受信');
+                    await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+                }
+            } catch (error) {
+                console.error('シグナリング処理エラー:', error);
             }
         });
 

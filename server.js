@@ -114,6 +114,9 @@ startTimer();
 // WebSocket接続
 wss.on('connection', (ws) => {
     console.log('新しいクライアントが接続しました');
+    
+    // クライアント識別用のID
+    ws.clientId = Math.random().toString(36).substr(2, 9);
 
     // 接続時に現在の状態を送信
     const currentEventNumber = state.eventNumbers[state.count % state.eventNumbers.length];
@@ -166,11 +169,12 @@ wss.on('connection', (ws) => {
                     broadcastTimer(currentTimerSeconds);
                     break;
 
-                // WebRTCシグナリング
+                // WebRTCシグナリング - 全クライアントにブロードキャスト
                 case 'webrtc-offer':
                 case 'webrtc-answer':
                 case 'webrtc-ice-candidate':
-                    // 他のクライアントに転送
+                    console.log(`WebRTCシグナリング: ${data.type} from ${ws.clientId}`);
+                    // 送信者以外の全クライアントに転送
                     wss.clients.forEach((client) => {
                         if (client !== ws && client.readyState === WebSocket.OPEN) {
                             client.send(message);
@@ -184,7 +188,7 @@ wss.on('connection', (ws) => {
     });
 
     ws.on('close', () => {
-        console.log('クライアントが切断しました');
+        console.log(`クライアントが切断しました: ${ws.clientId}`);
     });
 });
 
