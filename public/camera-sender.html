@@ -65,14 +65,21 @@
         const cameraType = document.getElementById('camera-type');
 
         let localStream = null;
-        let peerConnection = null;
+        let peerConnections = {}; // streamId -> RTCPeerConnection
         let currentFacingMode = 'user'; // 'user' = インカメラ, 'environment' = アウトカメラ
+        let myStreamId = Math.random().toString(36).substr(2, 9); // このストリームのID
 
         // 接続状態の表示
         wsClient.onStatusChange((isConnected) => {
             if (isConnected) {
                 statusElement.textContent = '✅ サーバーに接続されています';
                 statusElement.className = 'connection-status connected';
+                // サーバーに送信側として登録
+                wsClient.send({
+                    type: 'register',
+                    role: 'sender',
+                    streamId: myStreamId
+                });
             } else {
                 statusElement.textContent = '❌ サーバーに接続されていません';
                 statusElement.className = 'connection-status disconnected';
@@ -103,8 +110,9 @@
                 stopBtn.style.display = 'inline-block';
                 switchCameraBtn.style.display = 'inline-block';
 
-                // WebRTC接続を開始
-                await startWebRTC();
+                // サーバーに送信開始を通知（既存の受信側に接続）
+                console.log('送信開始を通知');
+
             } catch (error) {
                 console.error('カメラアクセスエラー:', error);
                 alert('カメラにアクセスできませんでした。\n' + error.message);
@@ -119,11 +127,9 @@
                 localVideo.srcObject = null;
             }
 
-            // ピア接続を閉じる
-            if (peerConnection) {
-                peerConnection.close();
-                peerConnection = null;
-            }
+            // すべてのピア接続を閉じる
+            Object.values(peerConnections).forEach(pc => pc.close());
+            peerConnections = {};
 
             streamState.textContent = '停止中';
             streamState.style.color = '#999';
@@ -141,15 +147,10 @@
             await startCamera();
         }
 
-        // WebRTC接続を開始
-        async function startWebRTC() {
+        // WebRTC接続を開始（受信側ごとに作成）
+        async function createPeerConnection(receiverId) {
             try {
-                // 既存の接続があれば閉じる
-                if (peerConnection) {
-                    peerConnection.close();
-                }
-
-                peerConnection = new RTCPeerConnection({
+                const peerConnection = new RTCPeerConnection({
                     iceServers: [
                         { urls: 'stun:stun.l.google.com:19302' },
                         { urls: 'stun:stun1.l.google.com:19302' }
@@ -163,17 +164,18 @@
 
                 // 接続状態の監視
                 peerConnection.onconnectionstatechange = () => {
-                    console.log('送信側接続状態:', peerConnection.connectionState);
+                    console.log(`送信側接続状態 (${receiverId}):`, peerConnection.connectionState);
                 };
 
                 // ICE候補を送信
                 peerConnection.onicecandidate = (event) => {
                     if (event.candidate) {
-                        console.log('送信側ICE候補を送信');
+                        console.log(`送信側ICE候補を送信 (${receiverId})`);
                         wsClient.send({
                             type: 'webrtc-ice-candidate',
                             candidate: event.candidate,
-                            from: 'sender'
+                            streamId: myStreamId,
+                            receiverId: receiverId
                         });
                     }
                 };
@@ -182,12 +184,15 @@
                 const offer = await peerConnection.createOffer();
                 await peerConnection.setLocalDescription(offer);
 
-                console.log('Offerを送信');
+                console.log(`Offerを送信 (${receiverId})`);
                 wsClient.send({
                     type: 'webrtc-offer',
                     offer: offer,
-                    from: 'sender'
+                    streamId: myStreamId,
+                    receiverId: receiverId
                 });
+
+                peerConnections[receiverId] = peerConnection;
 
             } catch (error) {
                 console.error('WebRTC接続エラー:', error);
@@ -198,12 +203,37 @@
         // WebRTCシグナリング
         wsClient.onMessage(async (data) => {
             try {
-                if (data.type === 'webrtc-answer' && peerConnection) {
-                    console.log('Answerを受信');
-                    await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
-                } else if (data.type === 'webrtc-ice-candidate' && data.from === 'receiver' && peerConnection) {
-                    console.log('受信側からICE候補を受信');
-                    await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+                // 新しい受信側が接続した場合
+                if (data.type === 'new-receiver' && localStream) {
+                    console.log('新しい受信側を検出:', data.receiverId);
+                    await createPeerConnection(data.receiverId);
+                }
+                // Answerを受信
+                else if (data.type === 'webrtc-answer') {
+                    const receiverId = data.receiverId;
+                    const pc = peerConnections[receiverId];
+                    if (pc) {
+                        console.log(`Answerを受信 (${receiverId})`);
+                        await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+                    }
+                }
+                // ICE候補を受信
+                else if (data.type === 'webrtc-ice-candidate' && data.streamId === myStreamId) {
+                    const receiverId = data.receiverId;
+                    const pc = peerConnections[receiverId];
+                    if (pc) {
+                        console.log(`受信側からICE候補を受信 (${receiverId})`);
+                        await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+                    }
+                }
+                // 受信側が切断した場合
+                else if (data.type === 'receiver-disconnected') {
+                    const receiverId = data.receiverId;
+                    if (peerConnections[receiverId]) {
+                        peerConnections[receiverId].close();
+                        delete peerConnections[receiverId];
+                        console.log(`受信側が切断しました (${receiverId})`);
+                    }
                 }
             } catch (error) {
                 console.error('シグナリング処理エラー:', error);

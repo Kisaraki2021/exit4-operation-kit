@@ -117,6 +117,8 @@ wss.on('connection', (ws) => {
 
     // クライアント識別用のID
     ws.clientId = Math.random().toString(36).substr(2, 9);
+    ws.streamId = null; // ストリームID（送信側のみ設定）
+    ws.role = null; // 'sender' または 'receiver'
 
     // 接続時に現在の状態を送信
     const currentEventNumber = state.eventNumbers[state.count % state.eventNumbers.length];
@@ -169,16 +171,74 @@ wss.on('connection', (ws) => {
                     broadcastTimer(currentTimerSeconds);
                     break;
 
-                // WebRTCシグナリング - 全クライアントにブロードキャスト
+                // クライアント登録（送信側/受信側の識別）
+                case 'register':
+                    ws.role = data.role;
+                    if (data.role === 'sender') {
+                        ws.streamId = data.streamId || ws.clientId;
+                        console.log(`送信側登録: ${ws.streamId}`);
+                    } else if (data.role === 'receiver') {
+                        console.log(`受信側登録: ${ws.clientId}`);
+                        // 既存の送信側のリストを送信
+                        const senders = Array.from(wss.clients)
+                            .filter(c => c.role === 'sender' && c.readyState === WebSocket.OPEN)
+                            .map(c => ({ streamId: c.streamId, clientId: c.clientId }));
+                        ws.send(JSON.stringify({
+                            type: 'sender-list',
+                            senders: senders
+                        }));
+                    }
+                    // 受信側に新しい送信側を通知
+                    if (data.role === 'sender') {
+                        wss.clients.forEach((client) => {
+                            if (client.role === 'receiver' && client.readyState === WebSocket.OPEN) {
+                                client.send(JSON.stringify({
+                                    type: 'new-sender',
+                                    streamId: ws.streamId,
+                                    clientId: ws.clientId
+                                }));
+                            }
+                        });
+                    }
+                    break;
+
+                // 受信側からの接続要求
+                case 'request-connection':
+                    const requestedStreamId = data.streamId;
+                    const receiverId = data.receiverId;
+                    console.log(`接続要求: streamId=${requestedStreamId}, receiverId=${receiverId}`);
+                    
+                    // 該当する送信側に通知
+                    wss.clients.forEach((client) => {
+                        if (client.role === 'sender' && client.streamId === requestedStreamId && client.readyState === WebSocket.OPEN) {
+                            client.send(JSON.stringify({
+                                type: 'new-receiver',
+                                receiverId: receiverId
+                            }));
+                        }
+                    });
+                    break;
+
+                // WebRTCシグナリング - ストリームIDベースで転送
                 case 'webrtc-offer':
                 case 'webrtc-answer':
                 case 'webrtc-ice-candidate':
-                    console.log(`WebRTCシグナリング: ${data.type} from ${ws.clientId}`);
-                    // 送信者以外の全クライアントに転送（JSONとして再送信）
+                    const targetStreamId = data.streamId;
+                    const targetReceiverId = data.receiverId;
+                    console.log(`WebRTCシグナリング: ${data.type} streamId=${targetStreamId} receiverId=${targetReceiverId} from ${ws.clientId} (${ws.role})`);
+                    
+                    // ストリームIDに基づいて適切なクライアントに転送
                     const forwardMessage = JSON.stringify(data);
                     wss.clients.forEach((client) => {
                         if (client !== ws && client.readyState === WebSocket.OPEN) {
-                            client.send(forwardMessage);
+                            // 送信側からのメッセージは該当する受信側へ
+                            if (ws.role === 'sender' && client.role === 'receiver' && client.clientId === targetReceiverId) {
+                                client.send(forwardMessage);
+                            }
+                            // 受信側からのメッセージは該当する送信側へ
+                            else if (ws.role === 'receiver' && client.role === 'sender' && client.streamId === targetStreamId) {
+                                client.send(forwardMessage);
+                            }
                         }
                     });
                     break;
@@ -189,7 +249,29 @@ wss.on('connection', (ws) => {
     });
 
     ws.on('close', () => {
-        console.log(`クライアントが切断しました: ${ws.clientId}`);
+        console.log(`クライアントが切断しました: ${ws.clientId} (${ws.role})`);
+        // 送信側が切断した場合、受信側に通知
+        if (ws.role === 'sender') {
+            wss.clients.forEach((client) => {
+                if (client.role === 'receiver' && client.readyState === WebSocket.OPEN) {
+                    client.send(JSON.stringify({
+                        type: 'sender-disconnected',
+                        streamId: ws.streamId
+                    }));
+                }
+            });
+        }
+        // 受信側が切断した場合、送信側に通知
+        else if (ws.role === 'receiver') {
+            wss.clients.forEach((client) => {
+                if (client.role === 'sender' && client.readyState === WebSocket.OPEN) {
+                    client.send(JSON.stringify({
+                        type: 'receiver-disconnected',
+                        receiverId: ws.clientId
+                    }));
+                }
+            });
+        }
     });
 });
 

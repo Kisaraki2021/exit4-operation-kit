@@ -1,0 +1,16 @@
+                        peerConnections[streamId].close();
+                        delete peerConnections[streamId];
+                    }
+                    removeStream(streamId);
+                }
+            } catch (error) {
+                console.error('WebRTC接続エラー:', error);
+                console.error('エラー詳細:', error.stack);
+            }
+        });
+
+        updateStreamCount();
+    </script>
+</body>
+
+</html>
