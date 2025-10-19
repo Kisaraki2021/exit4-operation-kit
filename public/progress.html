@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>進行状況 - 4番出口</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+
+<body>
+    <div class="container">
+        <div class="card">
+            <h1>📊 進行状況</h1>
+
+            <div class="status-display">
+                <div style="text-align: center;">
+                    <div class="status-label" style="font-size: 1.5em; margin-bottom: 20px;">
+                        現在の進行度合
+                    </div>
+                    <div class="progress-display" id="progress-display">0</div>
+                </div>
+            </div>
+
+            <div class="button-group">
+                <a href="/" class="nav-link">
+                    <button class="btn">🏠 ホームに戻る</button>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/websocket.js"></script>
+    <script>
+        const progressDisplay = document.getElementById('progress-display');
+
+        wsClient.onMessage((data) => {
+            if (data.type === 'state') {
+                progressDisplay.textContent = data.data.progress;
+            }
+        });
+    </script>
+</body>
+
+</html>

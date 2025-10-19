@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>参加者案内 - 4番出口</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+
+<body>
+    <div class="container">
+        <div class="card">
+            <h1>👥 参加者案内</h1>
+
+            <div class="status-display">
+                <div class="status-item">
+                    <span class="status-label">現在の進行度合:</span>
+                </div>
+                <div class="progress-display" id="progress-display">0</div>
+            </div>
+
+            <div class="status-display">
+                <div class="status-item">
+                    <span class="status-label">次の更新まで:</span>
+                </div>
+                <div class="timer-display" id="timer-display">30</div>
+                <div style="text-align: center; font-size: 1.5em; color: #666;">秒</div>
+            </div>
+
+            <div class="button-group">
+                <a href="/" class="nav-link">
+                    <button class="btn">🏠 ホームに戻る</button>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/websocket.js"></script>
+    <script>
+        const progressDisplay = document.getElementById('progress-display');
+        const timerDisplay = document.getElementById('timer-display');
+
+        wsClient.onMessage((data) => {
+            if (data.type === 'state') {
+                progressDisplay.textContent = data.data.progress;
+            } else if (data.type === 'timer') {
+                timerDisplay.textContent = data.data.remainingSeconds;
+            }
+        });
+    </script>
+</body>
+
+</html>

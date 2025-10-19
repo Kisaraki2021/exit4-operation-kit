@@ -1,0 +1,21 @@
+{
+    "name": "exit4-operation-kit",
+    "version": "1.0.0",
+    "description": "文化祭出し物運営用システム - 4番出口",
+    "main": "server.js",
+    "scripts": {
+        "start": "node server.js",
+        "dev": "node server.js"
+    },
+    "keywords": [
+        "webrtc",
+        "websocket",
+        "event-management"
+    ],
+    "author": "",
+    "license": "MIT",
+    "dependencies": {
+        "express": "^4.18.2",
+        "ws": "^8.14.2"
+    }
+}

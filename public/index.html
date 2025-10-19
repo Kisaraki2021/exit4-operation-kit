@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>4番出口 運営システム</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+
+<body>
+    <div class="container">
+        <div class="card">
+            <h1>🚪 4番出口 運営システム</h1>
+
+            <div class="connection-status" id="connection-status">
+                接続中...
+            </div>
+
+            <div class="nav-links">
+                <a href="/admin.html" class="nav-link">
+                    <button class="btn btn-large">🔧 管理画面</button>
+                </a>
+                <a href="/participant.html" class="nav-link">
+                    <button class="btn btn-large">👥 参加者案内</button>
+                </a>
+                <a href="/staff.html" class="nav-link">
+                    <button class="btn btn-large">📋 スタッフ指示</button>
+                </a>
+                <a href="/timer.html" class="nav-link">
+                    <button class="btn btn-large">⏱️ タイマー</button>
+                </a>
+                <a href="/progress.html" class="nav-link">
+                    <button class="btn btn-large">📊 進行状況画面</button>
+                </a>
+                <a href="/camera-sender.html" class="nav-link">
+                    <button class="btn btn-large">📹 カメラ映像送信</button>
+                </a>
+                <a href="/camera-receiver.html" class="nav-link">
+                    <button class="btn btn-large">📺 カメラ映像受信</button>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/websocket.js"></script>
+    <script>
+        const statusElement = document.getElementById('connection-status');
+
+        wsClient.onStatusChange((isConnected) => {
+            if (isConnected) {
+                statusElement.textContent = '✅ サーバーに接続されています';
+                statusElement.className = 'connection-status connected';
+            } else {
+                statusElement.textContent = '❌ サーバーに接続されていません';
+                statusElement.className = 'connection-status disconnected';
+            }
+        });
+    </script>
+</body>
+
+</html>

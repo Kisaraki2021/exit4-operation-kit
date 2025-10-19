@@ -1,0 +1,72 @@
+# nginx設定例 (LAN内SSL対応)
+
+# HTTPからHTTPSへのリダイレクト
+server {
+    listen 80;
+    server_name your-local-domain.local;  # LAN内のドメイン名に変更してください
+    return 301 https://$server_name$request_uri;
+}
+
+# HTTPS設定
+server {
+    listen 443 ssl http2;
+    server_name your-local-domain.local;  # LAN内のドメイン名に変更してください
+
+    # SSL証明書の設定
+    ssl_certificate /path/to/your/certificate.crt;      # SSL証明書のパス
+    ssl_certificate_key /path/to/your/private.key;      # 秘密鍵のパス
+    
+    # SSL設定（推奨）
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 10m;
+
+    # ログ設定
+    access_log /var/log/nginx/exit4_access.log;
+    error_log /var/log/nginx/exit4_error.log;
+
+    # 静的ファイル
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # WebSocket接続
+    location /ws {
+        proxy_pass http://localhost:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "Upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # WebSocketのタイムアウト設定
+        proxy_connect_timeout 7d;
+        proxy_send_timeout 7d;
+        proxy_read_timeout 7d;
+    }
+}
+
+# 設定手順:
+# 1. このファイルを /etc/nginx/sites-available/exit4 として保存
+# 2. シンボリックリンクを作成: sudo ln -s /etc/nginx/sites-available/exit4 /etc/nginx/sites-enabled/
+# 3. SSL証明書のパスを実際のパスに変更
+# 4. server_name を実際のLAN内ドメイン名またはIPアドレスに変更
+# 5. nginx設定をテスト: sudo nginx -t
+# 6. nginxを再起動: sudo systemctl restart nginx
+
+# LAN内SSL証明書の作成方法（自己署名証明書の例）:
+# openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+#   -keyout /etc/ssl/private/exit4.key \
+#   -out /etc/ssl/certs/exit4.crt

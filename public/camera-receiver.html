@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>カメラ映像受信 - 4番出口</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        .video-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .video-item {
+            background: #000;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .video-item video {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        .video-label {
+            background: #667eea;
+            color: white;
+            padding: 10px;
+            text-align: center;
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="card">
+            <h1>📺 カメラ映像受信</h1>
+
+            <div class="connection-status" id="connection-status">接続中...</div>
+
+            <div class="status-display">
+                <div class="status-item">
+                    <span class="status-label">受信中のストリーム数:</span>
+                    <span class="status-value" id="stream-count">0</span>
+                </div>
+            </div>
+
+            <div id="video-grid" class="video-grid">
+                <!-- 受信したビデオストリームがここに追加されます -->
+            </div>
+
+            <div id="no-stream-message" style="text-align: center; color: #999; margin: 40px 0; font-size: 1.2em;">
+                受信待機中...
+            </div>
+
+            <div class="button-group">
+                <a href="/" class="nav-link">
+                    <button class="btn">🏠 ホームに戻る</button>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/websocket.js"></script>
+    <script>
+        const statusElement = document.getElementById('connection-status');
+        const videoGrid = document.getElementById('video-grid');
+        const streamCount = document.getElementById('stream-count');
+        const noStreamMessage = document.getElementById('no-stream-message');
+
+        let peerConnections = [];
+        let streamCounter = 0;
+
+        // 接続状態の表示
+        wsClient.onStatusChange((isConnected) => {
+            if (isConnected) {
+                statusElement.textContent = '✅ サーバーに接続されています';
+                statusElement.className = 'connection-status connected';
+            } else {
+                statusElement.textContent = '❌ サーバーに接続されていません';
+                statusElement.className = 'connection-status disconnected';
+            }
+        });
+
+        // リモートストリームを表示
+        function addRemoteStream(stream) {
+            streamCounter++;
+
+            const videoItem = document.createElement('div');
+            videoItem.className = 'video-item';
+            videoItem.id = `stream-${streamCounter}`;
+
+            const label = document.createElement('div');
+            label.className = 'video-label';
+            label.textContent = `カメラ ${streamCounter}`;
+
+            const video = document.createElement('video');
+            video.autoplay = true;
+            video.playsinline = true;
+            video.srcObject = stream;
+
+            videoItem.appendChild(label);
+            videoItem.appendChild(video);
+            videoGrid.appendChild(videoItem);
+
+            updateStreamCount();
+        }
+
+        // ストリーム数を更新
+        function updateStreamCount() {
+            const count = videoGrid.children.length;
+            streamCount.textContent = count;
+
+            if (count > 0) {
+                noStreamMessage.style.display = 'none';
+            } else {
+                noStreamMessage.style.display = 'block';
+            }
+        }
+
+        // WebRTC接続を処理
+        wsClient.onMessage(async (data) => {
+            if (data.type === 'webrtc-offer') {
+                try {
+                    const peerConnection = new RTCPeerConnection({
+                        iceServers: [
+                            { urls: 'stun:stun.l.google.com:19302' }
+                        ]
+                    });
+
+                    // リモートストリームを受信
+                    peerConnection.ontrack = (event) => {
+                        addRemoteStream(event.streams[0]);
+                    };
+
+                    // ICE候補を送信
+                    peerConnection.onicecandidate = (event) => {
+                        if (event.candidate) {
+                            wsClient.send({
+                                type: 'webrtc-ice-candidate',
+                                candidate: event.candidate
+                            });
+                        }
+                    };
+
+                    // 接続状態の監視
+                    peerConnection.onconnectionstatechange = () => {
+                        console.log('接続状態:', peerConnection.connectionState);
+                        if (peerConnection.connectionState === 'disconnected' ||
+                            peerConnection.connectionState === 'failed' ||
+                            peerConnection.connectionState === 'closed') {
+                            // 切断された場合の処理
+                            const index = peerConnections.indexOf(peerConnection);
+                            if (index > -1) {
+                                peerConnections.splice(index, 1);
+                            }
+                        }
+                    };
+
+                    // Offerを設定してAnswerを作成
+                    await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+                    const answer = await peerConnection.createAnswer();
+                    await peerConnection.setLocalDescription(answer);
+
+                    // Answerを送信
+                    wsClient.send({
+                        type: 'webrtc-answer',
+                        answer: answer
+                    });
+
+                    peerConnections.push(peerConnection);
+                } catch (error) {
+                    console.error('WebRTC接続エラー:', error);
+                }
+            } else if (data.type === 'webrtc-ice-candidate') {
+                // ICE候補を追加
+                for (const pc of peerConnections) {
+                    try {
+                        await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+                    } catch (error) {
+                        console.error('ICE候補追加エラー:', error);
+                    }
+                }
+            }
+        });
+
+        updateStreamCount();
+    </script>
+</body>
+
+</html>

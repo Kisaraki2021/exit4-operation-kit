@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>タイマー - 4番出口</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+
+<body>
+    <div class="container">
+        <div class="card">
+            <h1>⏱️ タイマー</h1>
+
+            <div class="status-display">
+                <div style="text-align: center;">
+                    <div class="status-label" style="font-size: 1.5em; margin-bottom: 20px;">
+                        次の回数更新まで
+                    </div>
+                    <div class="timer-display" id="timer-display">30</div>
+                    <div style="font-size: 2em; color: #666;">秒</div>
+                </div>
+            </div>
+
+            <div class="button-group">
+                <a href="/" class="nav-link">
+                    <button class="btn">🏠 ホームに戻る</button>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/websocket.js"></script>
+    <script>
+        const timerDisplay = document.getElementById('timer-display');
+
+        wsClient.onMessage((data) => {
+            if (data.type === 'timer') {
+                timerDisplay.textContent = data.data.remainingSeconds;
+
+                // 残り時間が少ない場合は色を変える
+                if (data.data.remainingSeconds <= 5) {
+                    timerDisplay.style.color = '#eb3349';
+                } else if (data.data.remainingSeconds <= 10) {
+                    timerDisplay.style.color = '#f2994a';
+                } else {
+                    timerDisplay.style.color = '#667eea';
+                }
+            }
+        });
+    </script>
+</body>
+
+</html>

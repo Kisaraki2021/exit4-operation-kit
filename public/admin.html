@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管理画面 - 4番出口</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+
+<body>
+    <div class="container">
+        <div class="card">
+            <h1>🔧 管理画面</h1>
+
+            <div class="connection-status" id="connection-status">接続中...</div>
+
+            <div class="status-display">
+                <h2>現在の状態</h2>
+                <div class="status-item">
+                    <span class="status-label">回数:</span>
+                    <span class="status-value" id="count-display">0</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">進行度合:</span>
+                    <span class="status-value" id="progress-display">0</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">イベントナンバー:</span>
+                    <span class="status-value" id="event-number-display">-</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">スタッフ指示:</span>
+                    <span class="status-value" id="staff-status-display">作業中</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">次回更新まで:</span>
+                    <span class="status-value" id="timer-display">30</span> 秒
+                </div>
+            </div>
+
+            <div class="button-group">
+                <button class="btn btn-success btn-large" id="increase-btn">
+                    ⬆️ 進行度合を増やす
+                </button>
+                <button class="btn btn-warning btn-large" id="no-increase-btn">
+                    ⏸️ 進行度合を増やさない
+                </button>
+            </div>
+
+            <div class="button-group">
+                <button class="btn btn-danger btn-large" id="reset-btn">
+                    🔄 全てをリセット
+                </button>
+            </div>
+
+            <div class="button-group">
+                <a href="/" class="nav-link">
+                    <button class="btn">🏠 ホームに戻る</button>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/websocket.js"></script>
+    <script>
+        const statusElement = document.getElementById('connection-status');
+        const countDisplay = document.getElementById('count-display');
+        const progressDisplay = document.getElementById('progress-display');
+        const eventNumberDisplay = document.getElementById('event-number-display');
+        const staffStatusDisplay = document.getElementById('staff-status-display');
+        const timerDisplay = document.getElementById('timer-display');
+        const increaseBtn = document.getElementById('increase-btn');
+        const noIncreaseBtn = document.getElementById('no-increase-btn');
+        const resetBtn = document.getElementById('reset-btn');
+
+        // 接続状態の表示
+        wsClient.onStatusChange((isConnected) => {
+            if (isConnected) {
+                statusElement.textContent = '✅ サーバーに接続されています';
+                statusElement.className = 'connection-status connected';
+            } else {
+                statusElement.textContent = '❌ サーバーに接続されていません';
+                statusElement.className = 'connection-status disconnected';
+            }
+        });
+
+        // メッセージ受信
+        wsClient.onMessage((data) => {
+            if (data.type === 'state') {
+                countDisplay.textContent = data.data.count;
+                progressDisplay.textContent = data.data.progress;
+                eventNumberDisplay.textContent = data.data.currentEventNumber;
+                staffStatusDisplay.textContent = data.data.staffStatus ? '完了' : '作業中';
+                staffStatusDisplay.style.color = data.data.staffStatus ? '#56ab2f' : '#f2994a';
+            } else if (data.type === 'timer') {
+                timerDisplay.textContent = data.data.remainingSeconds;
+            }
+        });
+
+        // 進行度合を増やすボタン
+        increaseBtn.addEventListener('click', () => {
+            wsClient.send({ type: 'setProgressIncrease', value: true });
+            increaseBtn.style.opacity = '1';
+            noIncreaseBtn.style.opacity = '0.5';
+            alert('次の回数更新時に進行度合が増えます');
+        });
+
+        // 進行度合を増やさないボタン
+        noIncreaseBtn.addEventListener('click', () => {
+            wsClient.send({ type: 'setProgressIncrease', value: false });
+            increaseBtn.style.opacity = '0.5';
+            noIncreaseBtn.style.opacity = '1';
+            alert('次の回数更新時に進行度合は増えません');
+        });
+
+        // リセットボタン
+        resetBtn.addEventListener('click', () => {
+            if (confirm('本当に全てをリセットしますか?')) {
+                wsClient.send({ type: 'reset' });
+                increaseBtn.style.opacity = '1';
+                noIncreaseBtn.style.opacity = '1';
+            }
+        });
+    </script>
+</body>
+
+</html>

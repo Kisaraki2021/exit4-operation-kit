@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>スタッフ指示 - 4番出口</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+
+<body>
+    <div class="container">
+        <div class="card">
+            <h1>📋 スタッフ指示</h1>
+
+            <div class="status-display">
+                <h2>現在の状態</h2>
+                <div class="status-item">
+                    <span class="status-label">回数:</span>
+                    <span class="status-value" id="count-display">0</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">進行度合:</span>
+                    <span class="status-value" id="progress-display">0</span>
+                </div>
+            </div>
+
+            <div class="status-display">
+                <h2>次の作業内容</h2>
+                <div style="text-align: center;">
+                    <div class="status-item">
+                        <span class="status-label">イベントナンバー:</span>
+                        <span class="status-value" id="event-number-display">-</span>
+                    </div>
+                    <img id="event-image" class="image-display" src="" alt="イベント画像" style="display: none;">
+                    <div id="no-image-message" style="color: #999; margin: 20px 0; font-size: 1.2em;">
+                        画像を読み込み中...
+                    </div>
+                </div>
+            </div>
+
+            <div class="button-group">
+                <button class="btn btn-large" id="status-btn">
+                    作業中
+                </button>
+            </div>
+
+            <div class="button-group">
+                <a href="/" class="nav-link">
+                    <button class="btn">🏠 ホームに戻る</button>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/websocket.js"></script>
+    <script>
+        const countDisplay = document.getElementById('count-display');
+        const progressDisplay = document.getElementById('progress-display');
+        const eventNumberDisplay = document.getElementById('event-number-display');
+        const eventImage = document.getElementById('event-image');
+        const noImageMessage = document.getElementById('no-image-message');
+        const statusBtn = document.getElementById('status-btn');
+
+        let currentStatus = false;
+
+        wsClient.onMessage((data) => {
+            if (data.type === 'state') {
+                countDisplay.textContent = data.data.count;
+                progressDisplay.textContent = data.data.progress;
+                eventNumberDisplay.textContent = data.data.nextEventNumber;
+                currentStatus = data.data.staffStatus;
+
+                // 画像を更新
+                const imagePath = `/image/${data.data.nextEventNumber}.png`;
+                eventImage.src = imagePath;
+
+                // 画像の読み込み確認
+                eventImage.onload = () => {
+                    eventImage.style.display = 'block';
+                    noImageMessage.style.display = 'none';
+                };
+
+                eventImage.onerror = () => {
+                    eventImage.style.display = 'none';
+                    noImageMessage.style.display = 'block';
+                    noImageMessage.textContent = `画像が見つかりません: ${imagePath}`;
+                };
+
+                // ボタンの表示を更新
+                updateButtonStatus();
+            }
+        });
+
+        function updateButtonStatus() {
+            if (currentStatus) {
+                statusBtn.textContent = '✅ 完了';
+                statusBtn.className = 'btn btn-success btn-large';
+            } else {
+                statusBtn.textContent = '⏳ 作業中';
+                statusBtn.className = 'btn btn-warning btn-large';
+            }
+        }
+
+        statusBtn.addEventListener('click', () => {
+            if (!currentStatus) {
+                currentStatus = true;
+                wsClient.send({ type: 'setStaffStatus', value: true });
+                updateButtonStatus();
+            }
+        });
+    </script>
+</body>
+
+</html>

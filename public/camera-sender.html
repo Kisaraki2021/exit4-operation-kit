@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>カメラ映像送信 - 4番出口</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+
+<body>
+    <div class="container">
+        <div class="card">
+            <h1>📹 カメラ映像送信</h1>
+
+            <div class="connection-status" id="connection-status">接続中...</div>
+
+            <div class="status-display">
+                <h2>カメラプレビュー</h2>
+                <div class="video-container">
+                    <video id="local-video" autoplay playsinline muted></video>
+                </div>
+            </div>
+
+            <div class="button-group">
+                <button class="btn btn-success btn-large" id="start-btn">
+                    📹 送信開始
+                </button>
+                <button class="btn btn-danger btn-large" id="stop-btn" style="display: none;">
+                    ⏹️ 送信停止
+                </button>
+                <button class="btn btn-large" id="switch-camera-btn" style="display: none;">
+                    🔄 カメラ切替
+                </button>
+            </div>
+
+            <div id="stream-status" class="status-display" style="display: none;">
+                <div class="status-item">
+                    <span class="status-label">送信状態:</span>
+                    <span class="status-value" id="stream-state">停止中</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">カメラ:</span>
+                    <span class="status-value" id="camera-type">未選択</span>
+                </div>
+            </div>
+
+            <div class="button-group">
+                <a href="/" class="nav-link">
+                    <button class="btn">🏠 ホームに戻る</button>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/websocket.js"></script>
+    <script>
+        const statusElement = document.getElementById('connection-status');
+        const localVideo = document.getElementById('local-video');
+        const startBtn = document.getElementById('start-btn');
+        const stopBtn = document.getElementById('stop-btn');
+        const switchCameraBtn = document.getElementById('switch-camera-btn');
+        const streamStatus = document.getElementById('stream-status');
+        const streamState = document.getElementById('stream-state');
+        const cameraType = document.getElementById('camera-type');
+
+        let localStream = null;
+        let peerConnections = [];
+        let currentFacingMode = 'user'; // 'user' = インカメラ, 'environment' = アウトカメラ
+
+        // 接続状態の表示
+        wsClient.onStatusChange((isConnected) => {
+            if (isConnected) {
+                statusElement.textContent = '✅ サーバーに接続されています';
+                statusElement.className = 'connection-status connected';
+            } else {
+                statusElement.textContent = '❌ サーバーに接続されていません';
+                statusElement.className = 'connection-status disconnected';
+            }
+        });
+
+        // カメラストリームを開始
+        async function startCamera() {
+            try {
+                const constraints = {
+                    video: {
+                        facingMode: currentFacingMode,
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    },
+                    audio: true
+                };
+
+                localStream = await navigator.mediaDevices.getUserMedia(constraints);
+                localVideo.srcObject = localStream;
+
+                cameraType.textContent = currentFacingMode === 'user' ? 'インカメラ' : 'アウトカメラ';
+                streamState.textContent = '送信中';
+                streamState.style.color = '#56ab2f';
+                streamStatus.style.display = 'block';
+
+                startBtn.style.display = 'none';
+                stopBtn.style.display = 'inline-block';
+                switchCameraBtn.style.display = 'inline-block';
+
+                // WebRTC接続を開始
+                await startWebRTC();
+            } catch (error) {
+                console.error('カメラアクセスエラー:', error);
+                alert('カメラにアクセスできませんでした。\n' + error.message);
+            }
+        }
+
+        // カメラストリームを停止
+        function stopCamera() {
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+                localStream = null;
+                localVideo.srcObject = null;
+            }
+
+            // すべてのピア接続を閉じる
+            peerConnections.forEach(pc => pc.close());
+            peerConnections = [];
+
+            streamState.textContent = '停止中';
+            streamState.style.color = '#999';
+            cameraType.textContent = '未選択';
+
+            startBtn.style.display = 'inline-block';
+            stopBtn.style.display = 'none';
+            switchCameraBtn.style.display = 'none';
+        }
+
+        // カメラを切り替え
+        async function switchCamera() {
+            currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
+            stopCamera();
+            await startCamera();
+        }
+
+        // WebRTC接続を開始
+        async function startWebRTC() {
+            try {
+                const peerConnection = new RTCPeerConnection({
+                    iceServers: [
+                        { urls: 'stun:stun.l.google.com:19302' }
+                    ]
+                });
+
+                // ローカルストリームを追加
+                localStream.getTracks().forEach(track => {
+                    peerConnection.addTrack(track, localStream);
+                });
+
+                // ICE候補を送信
+                peerConnection.onicecandidate = (event) => {
+                    if (event.candidate) {
+                        wsClient.send({
+                            type: 'webrtc-ice-candidate',
+                            candidate: event.candidate
+                        });
+                    }
+                };
+
+                // Offerを作成して送信
+                const offer = await peerConnection.createOffer();
+                await peerConnection.setLocalDescription(offer);
+
+                wsClient.send({
+                    type: 'webrtc-offer',
+                    offer: offer
+                });
+
+                peerConnections.push(peerConnection);
+            } catch (error) {
+                console.error('WebRTC接続エラー:', error);
+            }
+        }
+
+        // WebRTCシグナリング
+        wsClient.onMessage(async (data) => {
+            if (data.type === 'webrtc-answer' && peerConnections.length > 0) {
+                const pc = peerConnections[peerConnections.length - 1];
+                await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+            } else if (data.type === 'webrtc-ice-candidate' && peerConnections.length > 0) {
+                const pc = peerConnections[peerConnections.length - 1];
+                await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+            }
+        });
+
+        // イベントリスナー
+        startBtn.addEventListener('click', startCamera);
+        stopBtn.addEventListener('click', stopCamera);
+        switchCameraBtn.addEventListener('click', switchCamera);
+    </script>
+</body>
+
+</html>
