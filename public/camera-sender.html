@@ -22,6 +22,19 @@
                 <small>現在のURL: <code id="current-url"></code></small>
             </div>
 
+            <!-- 送信ID設定 -->
+            <div class="status-display">
+                <h2>送信側設定</h2>
+                <div class="status-item">
+                    <label for="sender-name" style="display: block; margin-bottom: 5px; font-weight: bold;">表示名:</label>
+                    <input type="text" id="sender-name" placeholder="例: カメラ1, 正面カメラ" style="width: 100%; padding: 10px; font-size: 16px; border: 2px solid #667eea; border-radius: 5px;" />
+                </div>
+                <div class="status-item" style="margin-top: 10px;">
+                    <span class="status-label">あなたのID:</span>
+                    <span class="status-value" id="my-stream-id" style="font-family: monospace; background: #f0f0f0; padding: 5px 10px; border-radius: 3px;">-</span>
+                </div>
+            </div>
+
             <div class="status-display">
                 <h2>カメラプレビュー</h2>
                 <div class="video-container">
@@ -72,6 +85,8 @@
         const cameraType = document.getElementById('camera-type');
         const httpsWarning = document.getElementById('https-warning');
         const currentUrlElement = document.getElementById('current-url');
+        const senderNameInput = document.getElementById('sender-name');
+        const myStreamIdElement = document.getElementById('my-stream-id');
 
         // HTTPS状態チェック
         if (window.location.protocol !== 'https:' && 
@@ -82,9 +97,31 @@
         }
 
         let localStream = null;
-        let peerConnections = {}; // streamId -> RTCPeerConnection
+        let peerConnections = {}; // receiverId -> RTCPeerConnection
         let currentFacingMode = 'user'; // 'user' = インカメラ, 'environment' = アウトカメラ
         let myStreamId = Math.random().toString(36).substr(2, 9); // このストリームのID
+
+        // ストリームIDを表示
+        myStreamIdElement.textContent = myStreamId;
+
+        // ローカルストレージから前回の表示名を復元
+        const savedName = localStorage.getItem('senderName');
+        if (savedName) {
+            senderNameInput.value = savedName;
+        }
+
+        // 表示名が変更されたら保存
+        senderNameInput.addEventListener('input', () => {
+            localStorage.setItem('senderName', senderNameInput.value);
+            // サーバーに更新を送信（接続中の場合）
+            if (wsClient.ws && wsClient.ws.readyState === WebSocket.OPEN) {
+                wsClient.send({
+                    type: 'update-sender-info',
+                    streamId: myStreamId,
+                    displayName: senderNameInput.value || `送信側-${myStreamId}`
+                });
+            }
+        });
 
         // 接続状態の表示
         wsClient.onStatusChange((isConnected) => {
@@ -95,7 +132,8 @@
                 wsClient.send({
                     type: 'register',
                     role: 'sender',
-                    streamId: myStreamId
+                    streamId: myStreamId,
+                    displayName: senderNameInput.value || `送信側-${myStreamId}`
                 });
             } else {
                 statusElement.textContent = '❌ サーバーに接続されていません';
