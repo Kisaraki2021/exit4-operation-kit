@@ -1,10 +1,30 @@
 const express = require('express');
 const http = require('http');
-const WebSocket = require('ws');
+const https = require('https');
+const fs = require('fs');
 const path = require('path');
+const WebSocket = require('ws');
 
 const app = express();
-const server = http.createServer(app);
+
+// SSL証明書の読み込み（存在する場合）
+let server;
+const sslKeyPath = path.join(__dirname, 'ssl', 'private.key');
+const sslCertPath = path.join(__dirname, 'ssl', 'certificate.crt');
+
+if (fs.existsSync(sslKeyPath) && fs.existsSync(sslCertPath)) {
+    const httpsOptions = {
+        key: fs.readFileSync(sslKeyPath),
+        cert: fs.readFileSync(sslCertPath)
+    };
+    server = https.createServer(httpsOptions, app);
+    console.log('✅ HTTPS モードで起動します');
+} else {
+    server = http.createServer(app);
+    console.log('⚠️  HTTP モードで起動します（iOS対応にはHTTPSが必要です）');
+    console.log('SSL証明書を生成するには: npm run generate-ssl または .\generate-ssl-cert.ps1');
+}
+
 const wss = new WebSocket.Server({ server });
 
 // 静的ファイルの提供
@@ -277,5 +297,14 @@ wss.on('connection', (ws) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-    console.log(`サーバーが起動しました: http://localhost:${PORT}`);
+    const protocol = server instanceof https.Server ? 'https' : 'http';
+    console.log(`サーバーが起動しました: ${protocol}://localhost:${PORT}`);
+    console.log('');
+    if (protocol === 'http') {
+        console.log('📱 iOSデバイスでカメラを使用する場合:');
+        console.log('   1. SSL証明書を生成: .\\generate-ssl-cert.ps1');
+        console.log('   2. nginxでHTTPSリバースプロキシを設定');
+        console.log('   または');
+        console.log('   3. ngrokなどのトンネリングサービスを使用');
+    }
 });

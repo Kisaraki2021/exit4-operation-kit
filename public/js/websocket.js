@@ -9,9 +9,12 @@ class WebSocketClient {
     }
 
     connect() {
+        // プロトコルを自動判定（HTTPSの場合はWSS、HTTPの場合はWS）
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsUrl = `${protocol}//${window.location.host}`;
+        const host = window.location.host;
+        const wsUrl = `${protocol}//${host}`;
 
+        console.log(`WebSocket接続試行: ${wsUrl}`);
         this.ws = new WebSocket(wsUrl);
 
         this.ws.onopen = () => {
