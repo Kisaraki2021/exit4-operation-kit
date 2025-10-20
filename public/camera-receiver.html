@@ -100,6 +100,7 @@
         const senderListElement = document.getElementById('sender-list');
 
         let peerConnections = {}; // streamId -> RTCPeerConnection
+        let remoteStreams = {}; // streamId -> MediaStream (受信したストリーム)
         let streamCounter = 0;
         let myReceiverId = null; // この受信側のID（サーバーから取得）
         let availableSenders = new Map(); // streamId -> {displayName, clientId}
@@ -184,66 +185,101 @@
             }
         });
 
-        // リモートストリームを表示
-        function addRemoteStream(stream, streamId) {
-            // 既に表示されている場合は、ビデオ要素のストリームを更新
-            const existingVideoItem = document.getElementById(`stream-${streamId}`);
-            if (existingVideoItem) {
-                console.log(`ストリーム ${streamId} は既に表示されています - ストリームを更新`);
-                const video = existingVideoItem.querySelector('video');
-                if (video && video.srcObject !== stream) {
-                    video.srcObject = stream;
-                    console.log(`ビデオ要素のストリームを更新しました (${streamId})`);
-                    console.log(`更新後のトラック:`, stream.getTracks().map(t => `${t.kind}:${t.readyState}`));
-                }
+        // リモートストリームを表示・更新
+        function updateRemoteVideo(streamId) {
+            const stream = remoteStreams[streamId];
+            if (!stream) {
+                console.error(`ストリーム ${streamId} が見つかりません`);
                 return;
             }
 
-            streamCounter++;
-            connectedSenders.add(streamId);
-
-            const videoItem = document.createElement('div');
-            videoItem.className = 'video-item';
-            videoItem.id = `stream-${streamId}`;
-
-            const label = document.createElement('div');
-            label.className = 'video-label';
-            const displayName = availableSenders.get(streamId)?.displayName || `送信側-${streamId}`;
-            label.textContent = `${displayName} (ID: ${streamId})`;
-
-            const video = document.createElement('video');
-            video.autoplay = true;
-            video.playsinline = true;
-            video.muted = false; // ミュートを解除
-            video.srcObject = stream;
-            
-            console.log(`ビデオ要素を作成: autoplay=${video.autoplay}, playsinline=${video.playsinline}`);
-            console.log(`ストリームのアクティブトラック:`, stream.getTracks().map(t => `${t.kind}:${t.readyState}`));
-
-            // ビデオの再生を確実にするためのイベントリスナー
-            video.addEventListener('loadedmetadata', () => {
-                console.log(`ビデオメタデータ読み込み完了 (${streamId})`);
-                video.play().catch(e => console.error('ビデオ再生エラー:', e));
+            console.log(`ビデオを更新: ${streamId}`);
+            console.log(`トラック数: ${stream.getTracks().length}`);
+            stream.getTracks().forEach(track => {
+                console.log(`- ${track.kind}: ${track.readyState}, enabled: ${track.enabled}`);
             });
 
-            videoItem.appendChild(label);
-            videoItem.appendChild(video);
-            videoGrid.appendChild(videoItem);
+            // 既にビデオ要素がある場合
+            let videoItem = document.getElementById(`stream-${streamId}`);
+            let video;
+
+            if (videoItem) {
+                // 既存のビデオ要素を取得
+                video = videoItem.querySelector('video');
+                console.log(`既存のビデオ要素を更新 (${streamId})`);
+            } else {
+                // 新しくビデオ要素を作成
+                console.log(`新しいビデオ要素を作成 (${streamId})`);
+                streamCounter++;
+                connectedSenders.add(streamId);
+
+                videoItem = document.createElement('div');
+                videoItem.className = 'video-item';
+                videoItem.id = `stream-${streamId}`;
+
+                const label = document.createElement('div');
+                label.className = 'video-label';
+                const displayName = availableSenders.get(streamId)?.displayName || `送信側-${streamId}`;
+                label.textContent = `${displayName} (ID: ${streamId})`;
+
+                video = document.createElement('video');
+                video.autoplay = true;
+                video.playsinline = true;
+                video.muted = false;
+                video.controls = false;
+                video.style.width = '100%';
+                video.style.height = 'auto';
+                video.style.display = 'block';
+                video.style.backgroundColor = '#000';
+
+                videoItem.appendChild(label);
+                videoItem.appendChild(video);
+                videoGrid.appendChild(videoItem);
+            }
+
+            // ストリームをビデオ要素に設定
+            video.srcObject = stream;
+            
+            // 確実に再生を開始
+            video.onloadedmetadata = () => {
+                console.log(`メタデータ読み込み完了 (${streamId}), ビデオサイズ: ${video.videoWidth}x${video.videoHeight}`);
+                video.play()
+                    .then(() => console.log(`ビデオ再生開始 (${streamId})`))
+                    .catch(e => console.error(`ビデオ再生エラー (${streamId}):`, e));
+            };
+
+            // 既にメタデータが読み込まれている場合は即座に再生
+            if (video.readyState >= 1) {
+                console.log(`メタデータ読み込み済み、再生を開始 (${streamId})`);
+                video.play()
+                    .then(() => console.log(`ビデオ再生開始 (${streamId})`))
+                    .catch(e => console.error(`ビデオ再生エラー (${streamId}):`, e));
+            }
 
             updateStreamCount();
-            updateSenderList(); // リスト表示を更新
-            console.log(`リモートストリームを表示しました (${streamId})`);
+            updateSenderList();
         }
 
         // ストリームを削除
         function removeStream(streamId) {
             const videoItem = document.getElementById(`stream-${streamId}`);
             if (videoItem) {
+                // ビデオ要素を取得してストリームをクリア
+                const video = videoItem.querySelector('video');
+                if (video) {
+                    video.srcObject = null;
+                }
                 videoItem.remove();
                 connectedSenders.delete(streamId);
                 updateStreamCount();
-                updateSenderList(); // リスト表示を更新
+                updateSenderList();
                 console.log(`ストリームを削除しました (${streamId})`);
+            }
+            
+            // MediaStreamも削除
+            if (remoteStreams[streamId]) {
+                remoteStreams[streamId].getTracks().forEach(track => track.stop());
+                delete remoteStreams[streamId];
             }
         }
 
@@ -346,14 +382,26 @@
 
                     // リモートストリームを受信
                     peerConnection.ontrack = (event) => {
-                        console.log(`トラックを受信 (${streamId}):`, event.track.kind, event.track.id);
-                        console.log('ストリーム:', event.streams);
-                        if (event.streams && event.streams[0]) {
-                            console.log(`ストリームのトラック数: ${event.streams[0].getTracks().length}`);
-                            addRemoteStream(event.streams[0], streamId);
-                        } else {
-                            console.error('ストリームが見つかりません!');
+                        console.log(`📥 トラックを受信 (${streamId}): ${event.track.kind} (ID: ${event.track.id})`);
+                        
+                        // MediaStreamを作成または取得
+                        if (!remoteStreams[streamId]) {
+                            console.log(`🆕 新しいMediaStreamを作成 (${streamId})`);
+                            remoteStreams[streamId] = new MediaStream();
                         }
+                        
+                        // トラックを追加
+                        const stream = remoteStreams[streamId];
+                        const existingTrack = stream.getTracks().find(t => t.id === event.track.id);
+                        if (!existingTrack) {
+                            stream.addTrack(event.track);
+                            console.log(`✅ トラックを追加: ${event.track.kind}, 現在のトラック数: ${stream.getTracks().length}`);
+                        } else {
+                            console.log(`⚠️ トラック ${event.track.id} は既に存在します`);
+                        }
+                        
+                        // ビデオ要素を更新（トラックが揃うのを待つ）
+                        updateRemoteVideo(streamId);
                     };
 
                     // ICE候補を送信
