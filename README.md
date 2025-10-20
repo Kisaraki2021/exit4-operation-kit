@@ -39,6 +39,95 @@ npm start
 ## nginx設定
 SSL証明書を使用する場合は、`nginx.conf.example` を参考にnginxを設定してください。
 
+### SSL証明書の生成と設定
+
+#### 1. SSL証明書の生成
+**Linux/macOS:**
+```bash
+./generate-ssl-cert.sh
+```
+
+**Windows (PowerShell):**
+```powershell
+.\generate-ssl-cert.ps1
+```
+
+スクリプトを実行すると、`./ssl/` ディレクトリに以下のファイルが生成されます:
+- `certificate.crt` - SSL証明書
+- `private.key` - 秘密鍵
+
+#### 2. nginx設定ファイルの配置
+
+**Linux/macOS:**
+```bash
+# 設定ファイルをコピー
+sudo cp nginx.conf.example /etc/nginx/sites-available/exit4
+
+# シンボリックリンクを作成
+sudo ln -s /etc/nginx/sites-available/exit4 /etc/nginx/sites-enabled/
+
+# 設定ファイルを編集（証明書のパスとserver_nameを変更）
+sudo nano /etc/nginx/sites-available/exit4
+
+# 設定テスト
+sudo nginx -t
+
+# nginxを再起動
+sudo systemctl restart nginx
+```
+
+**Windows:**
+```powershell
+# 設定ファイルをコピー
+copy nginx.conf.example C:\nginx\conf\exit4.conf
+
+# nginx.confに以下を追加:
+# include conf/exit4.conf;
+
+# 設定ファイルを編集（証明書のパスとserver_nameを変更）
+notepad C:\nginx\conf\exit4.conf
+
+# 設定テスト
+C:\nginx\nginx.exe -t
+
+# nginxをリロード
+C:\nginx\nginx.exe -s reload
+```
+
+#### 3. hostsファイルの設定（ローカルテスト用）
+
+**Linux/macOS:**
+```bash
+sudo nano /etc/hosts
+```
+
+**Windows (管理者権限):**
+```powershell
+notepad C:\Windows\System32\drivers\etc\hosts
+```
+
+以下の行を追加:
+```
+127.0.0.1  exit4-operation.local
+```
+
+#### 4. アクセス確認
+
+ブラウザで `https://exit4-operation.local` にアクセス
+
+**注意:** 自己署名証明書のため、ブラウザでセキュリティ警告が表示されます。
+「詳細設定」→「サイトにアクセスする」を選択してください。
+
+### nginx設定のポイント
+
+- **リバースプロキシ:** Node.jsサーバー(ポート3000)へのリクエストを転送
+- **WebSocket対応:** `/ws` エンドポイントで長時間接続をサポート
+- **SSL/TLS:** TLSv1.2/1.3をサポート、安全な暗号化設定
+- **セキュリティヘッダー:** XSS、クリックジャッキング対策のヘッダーを追加
+- **静的ファイルキャッシュ:** 画像/CSS/JSファイルのキャッシュでパフォーマンス向上
+
+詳細な設定手順とトラブルシューティングは `nginx.conf.example` を参照してください。
+
 ## システム仕様
 
 ### データ構造
