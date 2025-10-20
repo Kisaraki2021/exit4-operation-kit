@@ -11,10 +11,22 @@ $DEFAULT_DOMAIN = "exit4-operation.local"
 $DEFAULT_DAYS = 365
 $CERT_DIR = ".\ssl"
 
+# 現在のIPアドレスを取得
+$localIP = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.InterfaceAlias -notlike "*Loopback*" -and $_.IPAddress -notlike "169.254.*" } | Select-Object -First 1).IPAddress
+
+Write-Host "検出されたIPアドレス: $localIP" -ForegroundColor Cyan
+Write-Host ""
+
 # ドメイン名の入力
 $DOMAIN = Read-Host "ドメイン名またはIPアドレスを入力してください [$DEFAULT_DOMAIN]"
 if ([string]::IsNullOrWhiteSpace($DOMAIN)) {
     $DOMAIN = $DEFAULT_DOMAIN
+}
+
+# IPアドレスの入力
+$IP_ADDRESS = Read-Host "追加するIPアドレスを入力してください（カンマ区切りで複数可） [$localIP]"
+if ([string]::IsNullOrWhiteSpace($IP_ADDRESS)) {
+    $IP_ADDRESS = $localIP
 }
 
 # 有効期限の入力
@@ -34,11 +46,20 @@ Write-Host ""
 Write-Host "証明書を生成しています..." -ForegroundColor Yellow
 Write-Host "ドメイン: $DOMAIN"
 Write-Host "有効期限: $DAYS 日"
+Write-Host "IPアドレス: $IP_ADDRESS"
 Write-Host "出力先: $CERT_DIR\"
 Write-Host ""
 
 # OpenSSLがインストールされているか確認
 $opensslPath = Get-Command openssl -ErrorAction SilentlyContinue
+
+# SubjectAltNameの構築
+$ipAddresses = $IP_ADDRESS -split ',' | ForEach-Object { $_.Trim() }
+$sanIPs = ($ipAddresses | ForEach-Object { "IP:$_" }) -join ','
+$sanEntries = "DNS:$DOMAIN,DNS:localhost,IP:127.0.0.1,$sanIPs"
+
+Write-Host "SAN エントリ: $sanEntries" -ForegroundColor Gray
+Write-Host ""
 
 if ($null -eq $opensslPath) {
     Write-Host "エラー: OpenSSLがインストールされていません。" -ForegroundColor Red
@@ -66,7 +87,7 @@ $certificatePath = Join-Path $CERT_DIR "certificate.crt"
   -keyout $privateKeyPath `
   -out $certificatePath `
   -subj "/C=JP/ST=Tokyo/L=Tokyo/O=Exit4 Operation/OU=IT/CN=$DOMAIN" `
-  -addext "subjectAltName=DNS:$DOMAIN,DNS:localhost,IP:127.0.0.1"
+  -addext "subjectAltName=$sanEntries"
 
 if ($LASTEXITCODE -eq 0) {
     Write-Host ""

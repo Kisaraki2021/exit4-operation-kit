@@ -9,10 +9,18 @@
 
 ### 1. SSL証明書の生成
 
+**重要:** SSL証明書には、アクセスするすべてのドメイン名とIPアドレスを含める必要があります。
+
 ```powershell
 # Git for Windowsに含まれるOpenSSLを使用
-& "C:\Program Files\Git\usr\bin\openssl.exe" req -x509 -nodes -days 365 -newkey rsa:2048 -keyout ssl/private.key -out ssl/certificate.crt -subj "/C=JP/ST=Tokyo/L=Tokyo/O=Exit4 Operation/OU=IT/CN=localhost"
+# PCのIPアドレスを確認
+ipconfig | Select-String "IPv4"
+
+# 証明書を生成（IPアドレスを実際の値に置き換えてください）
+& "C:\Program Files\Git\usr\bin\openssl.exe" req -x509 -nodes -days 365 -newkey rsa:2048 -keyout ssl/private.key -out ssl/certificate.crt -subj "/C=JP/ST=Tokyo/L=Tokyo/O=Exit4 Operation/OU=IT/CN=localhost" -addext "subjectAltName=DNS:localhost,DNS:exit4-operation.local,IP:127.0.0.1,IP:10.0.12.197"
 ```
+
+**注意:** `IP:10.0.12.197` の部分は、お使いのPCの実際のIPアドレスに変更してください。
 
 ### 2. サーバーの起動
 
@@ -33,13 +41,24 @@ npm start
 4. カメラ受信: `/camera-receiver.html`
 
 #### iOSデバイスから（同じネットワーク内）
-1. PCのIPアドレスを確認:
+1. PCのIPアドレスを確認（既に証明書に含まれている場合はスキップ）:
    ```powershell
    ipconfig | Select-String "IPv4"
    ```
-2. iOSのSafariで `https://[PCのIPアドレス]:3000` にアクセス
-3. 証明書の警告が表示されたら「詳細」→「このWebサイトを閲覧」を選択
-4. カメラの使用を許可
+   
+2. IPアドレスが証明書に含まれているか確認:
+   ```powershell
+   & "C:\Program Files\Git\usr\bin\openssl.exe" x509 -in ssl/certificate.crt -text -noout | Select-String "IP Address"
+   ```
+   
+3. 含まれていない場合は、証明書を再生成（上記「SSL証明書の生成」参照）
+
+4. iOSのSafariで `https://10.0.12.197:3000` にアクセス
+   - **重要:** IPアドレスは証明書に含まれているものを使用してください
+   
+5. 証明書の警告が表示されたら「詳細」→「このWebサイトを閲覧」を選択
+
+6. カメラの使用を許可
 
 ## 技術仕様
 
