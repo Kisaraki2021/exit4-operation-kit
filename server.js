@@ -213,6 +213,12 @@ wss.on('connection', (ws) => {
                         });
                     } else if (data.role === 'receiver') {
                         console.log(`受信側登録: ${ws.clientId}`);
+                        // 受信側に自身のIDを通知
+                        ws.send(JSON.stringify({
+                            type: 'registered',
+                            role: 'receiver',
+                            clientId: ws.clientId
+                        }));
                     }
                     break;
 

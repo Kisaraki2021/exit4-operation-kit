@@ -101,7 +101,7 @@
 
         let peerConnections = {}; // streamId -> RTCPeerConnection
         let streamCounter = 0;
-        let myReceiverId = Math.random().toString(36).substr(2, 9); // この受信側のID
+        let myReceiverId = null; // この受信側のID（サーバーから取得）
         let availableSenders = new Map(); // streamId -> {displayName, clientId}
         let connectedSenders = new Set(); // 既に接続済みのstreamId
 
@@ -113,12 +113,7 @@
                 // サーバーに受信側として登録
                 wsClient.send({
                     type: 'register',
-                    role: 'receiver',
-                    receiverId: myReceiverId
-                });
-                // 送信側リストを要求
-                wsClient.send({
-                    type: 'request-sender-list'
+                    role: 'receiver'
                 });
             } else {
                 statusElement.textContent = '❌ サーバーに接続されていません';
@@ -266,6 +261,17 @@
         // WebRTC接続を処理
         wsClient.onMessage(async (data) => {
             try {
+                // 登録完了通知を受信
+                if (data.type === 'registered' && data.role === 'receiver') {
+                    myReceiverId = data.clientId;
+                    console.log(`受信側として登録されました: ${myReceiverId}`);
+                    // 送信側リストを要求
+                    wsClient.send({
+                        type: 'request-sender-list'
+                    });
+                    return;
+                }
+                
                 // 既存の送信側リストを受信
                 if (data.type === 'sender-list') {
                     console.log('送信側リスト:', data.senders);
