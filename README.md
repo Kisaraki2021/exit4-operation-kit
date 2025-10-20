@@ -85,8 +85,10 @@ npx ngrok http 3000
 - スタッフ指示: `/staff.html`
 - タイマー: `/timer.html`
 - 進行状況画面: `/progress.html`
-- カメラ映像送信: `/camera-sender.html`
-- カメラ映像受信: `/camera-receiver.html`
+- カメラ映像送信: `/camera-sender.html` 📹
+- カメラ映像受信: `/camera-receiver.html` 📺
+
+**📱 iOSデバイスでカメラを使用する場合:** [カメラセットアップガイド](CAMERA_SETUP.md) を参照してください。
 
 ## nginx設定
 SSL証明書を使用する場合は、`nginx.conf.example` を参考にnginxを設定してください。
