@@ -92,6 +92,9 @@ npx ngrok http 3000
 - [カメラセットアップガイド](CAMERA_SETUP.md) - 詳細な技術情報
 - [iOSアクセス手順](iOS-ACCESS.md) - すぐに始めるクイックガイド（推奨）
 
+**🎥 複数カメラの送受信:**
+- [複数ペア送受信ガイド](MULTI-STREAM-GUIDE.md) - 複数カメラの運用方法
+
 ## nginx設定
 SSL証明書を使用する場合は、`nginx.conf.example` を参考にnginxを設定してください。
 
