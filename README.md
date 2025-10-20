@@ -41,7 +41,29 @@ SSL証明書を使用する場合は、`nginx.conf.example` を参考にnginxを
 
 ### SSL証明書の生成と設定
 
-#### 1. SSL証明書の生成
+#### 簡単セットアップ（推奨）
+
+自動セットアップスクリプトを使用すると、SSL証明書の生成からnginx設定まで一括で実行できます。
+
+**Linux/macOS:**
+```bash
+./setup-nginx.sh
+```
+
+**Windows (PowerShell - 管理者権限推奨):**
+```powershell
+.\setup-nginx.ps1
+```
+
+このスクリプトは以下を自動で実行します:
+1. SSL証明書の生成
+2. nginx設定ファイルの準備と配置
+3. nginx設定のテストと再起動
+4. hostsファイルの設定（オプション）
+
+#### 手動セットアップ
+
+##### 1. SSL証明書の生成
 **Linux/macOS:**
 ```bash
 ./generate-ssl-cert.sh
@@ -56,7 +78,9 @@ SSL証明書を使用する場合は、`nginx.conf.example` を参考にnginxを
 - `certificate.crt` - SSL証明書
 - `private.key` - 秘密鍵
 
-#### 2. nginx設定ファイルの配置
+**注意:** `ssl/`ディレクトリは`.gitignore`に含まれており、Gitで管理されません。
+
+##### 2. nginx設定ファイルの配置
 
 **Linux/macOS:**
 ```bash
@@ -94,7 +118,7 @@ C:\nginx\nginx.exe -t
 C:\nginx\nginx.exe -s reload
 ```
 
-#### 3. hostsファイルの設定（ローカルテスト用）
+##### 3. hostsファイルの設定（ローカルテスト用）
 
 **Linux/macOS:**
 ```bash
@@ -111,7 +135,7 @@ notepad C:\Windows\System32\drivers\etc\hosts
 127.0.0.1  exit4-operation.local
 ```
 
-#### 4. アクセス確認
+##### 4. アクセス確認
 
 ブラウザで `https://exit4-operation.local` にアクセス
 
