@@ -44,6 +44,28 @@
 
             <div class="connection-status" id="connection-status">接続中...</div>
 
+            <!-- 送信側選択UI -->
+            <div class="status-display">
+                <h2>送信側を選択</h2>
+                <div class="status-item">
+                    <label for="sender-id-input" style="display: block; margin-bottom: 5px; font-weight: bold;">
+                        送信側IDを入力 (または下のリストから選択):
+                    </label>
+                    <input type="text" id="sender-id-input" placeholder="送信側のIDを入力" 
+                           style="width: 100%; padding: 10px; font-size: 16px; border: 2px solid #667eea; border-radius: 5px; margin-bottom: 10px;" />
+                    <button class="btn btn-success" id="connect-btn">📡 接続</button>
+                </div>
+                
+                <div id="sender-list-container" style="margin-top: 20px;">
+                    <h3 style="margin-bottom: 10px;">利用可能な送信側:</h3>
+                    <div id="sender-list" style="display: flex; flex-direction: column; gap: 10px;">
+                        <div style="text-align: center; color: #999; padding: 20px;">
+                            送信側を検索中...
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="status-display">
                 <div class="status-item">
                     <span class="status-label">受信中のストリーム数:</span>
@@ -73,10 +95,15 @@
         const videoGrid = document.getElementById('video-grid');
         const streamCount = document.getElementById('stream-count');
         const noStreamMessage = document.getElementById('no-stream-message');
+        const senderIdInput = document.getElementById('sender-id-input');
+        const connectBtn = document.getElementById('connect-btn');
+        const senderListElement = document.getElementById('sender-list');
 
         let peerConnections = {}; // streamId -> RTCPeerConnection
         let streamCounter = 0;
-        let myReceiverId = Math.random().toString(36).substr(2, 9); // この受信側のID
+        let myReceiverId = null; // この受信側のID（サーバーから取得）
+        let availableSenders = new Map(); // streamId -> {displayName, clientId}
+        let connectedSenders = new Set(); // 既に接続済みのstreamId
 
         // 接続状態の表示
         wsClient.onStatusChange((isConnected) => {
@@ -86,8 +113,7 @@
                 // サーバーに受信側として登録
                 wsClient.send({
                     type: 'register',
-                    role: 'receiver',
-                    receiverId: myReceiverId
+                    role: 'receiver'
                 });
             } else {
                 statusElement.textContent = '❌ サーバーに接続されていません';
@@ -95,9 +121,79 @@
             }
         });
 
+        // 送信側リストを更新
+        function updateSenderList() {
+            if (availableSenders.size === 0) {
+                senderListElement.innerHTML = '<div style="text-align: center; color: #999; padding: 20px;">利用可能な送信側がありません</div>';
+                return;
+            }
+
+            senderListElement.innerHTML = '';
+            availableSenders.forEach((info, streamId) => {
+                const senderItem = document.createElement('div');
+                senderItem.style.cssText = 'border: 2px solid #667eea; border-radius: 8px; padding: 15px; cursor: pointer; transition: background 0.3s;';
+                
+                const isConnected = connectedSenders.has(streamId);
+                if (isConnected) {
+                    senderItem.style.background = '#e8f5e9';
+                    senderItem.style.borderColor = '#4caf50';
+                }
+
+                senderItem.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <div style="font-weight: bold; font-size: 1.1em; margin-bottom: 5px;">
+                                ${info.displayName}
+                            </div>
+                            <div style="font-family: monospace; color: #666; font-size: 0.9em;">
+                                ID: ${streamId}
+                            </div>
+                        </div>
+                        <div>
+                            ${isConnected ? 
+                                '<span style="background: #4caf50; color: white; padding: 5px 15px; border-radius: 20px; font-size: 0.9em;">接続中</span>' : 
+                                '<button class="btn btn-success" style="margin: 0;">接続</button>'}
+                        </div>
+                    </div>
+                `;
+
+                if (!isConnected) {
+                    senderItem.addEventListener('click', () => {
+                        senderIdInput.value = streamId;
+                        connectToSender(streamId);
+                    });
+                    senderItem.addEventListener('mouseenter', () => {
+                        senderItem.style.background = '#f5f5f5';
+                    });
+                    senderItem.addEventListener('mouseleave', () => {
+                        senderItem.style.background = '';
+                    });
+                }
+
+                senderListElement.appendChild(senderItem);
+            });
+        }
+
+        // 接続ボタンのイベント
+        connectBtn.addEventListener('click', () => {
+            const streamId = senderIdInput.value.trim();
+            if (streamId) {
+                connectToSender(streamId);
+            } else {
+                alert('送信側のIDを入力してください');
+            }
+        });
+
         // リモートストリームを表示
         function addRemoteStream(stream, streamId) {
+            // 既に表示されている場合はスキップ
+            if (document.getElementById(`stream-${streamId}`)) {
+                console.log(`ストリーム ${streamId} は既に表示されています`);
+                return;
+            }
+
             streamCounter++;
+            connectedSenders.add(streamId);
 
             const videoItem = document.createElement('div');
             videoItem.className = 'video-item';
@@ -105,7 +201,8 @@
 
             const label = document.createElement('div');
             label.className = 'video-label';
-            label.textContent = `カメラ ${streamCounter} (ID: ${streamId})`;
+            const displayName = availableSenders.get(streamId)?.displayName || `送信側-${streamId}`;
+            label.textContent = `${displayName} (ID: ${streamId})`;
 
             const video = document.createElement('video');
             video.autoplay = true;
@@ -117,6 +214,7 @@
             videoGrid.appendChild(videoItem);
 
             updateStreamCount();
+            updateSenderList(); // リスト表示を更新
             console.log(`リモートストリームを表示しました (${streamId})`);
         }
 
@@ -125,7 +223,9 @@
             const videoItem = document.getElementById(`stream-${streamId}`);
             if (videoItem) {
                 videoItem.remove();
+                connectedSenders.delete(streamId);
                 updateStreamCount();
+                updateSenderList(); // リスト表示を更新
                 console.log(`ストリームを削除しました (${streamId})`);
             }
         }
@@ -161,17 +261,54 @@
         // WebRTC接続を処理
         wsClient.onMessage(async (data) => {
             try {
+                // 登録完了通知を受信
+                if (data.type === 'registered' && data.role === 'receiver') {
+                    myReceiverId = data.clientId;
+                    console.log(`受信側として登録されました: ${myReceiverId}`);
+                    // 送信側リストを要求
+                    wsClient.send({
+                        type: 'request-sender-list'
+                    });
+                    return;
+                }
+                
                 // 既存の送信側リストを受信
                 if (data.type === 'sender-list') {
                     console.log('送信側リスト:', data.senders);
+                    availableSenders.clear();
                     data.senders.forEach(sender => {
-                        connectToSender(sender.streamId);
+                        availableSenders.set(sender.streamId, {
+                            displayName: sender.displayName || `送信側-${sender.streamId}`,
+                            clientId: sender.clientId
+                        });
                     });
+                    updateSenderList();
                 }
                 // 新しい送信側を検出
                 else if (data.type === 'new-sender') {
-                    console.log('新しい送信側を検出:', data.streamId);
-                    connectToSender(data.streamId);
+                    console.log('新しい送信側を検出:', data.streamId, data.displayName);
+                    availableSenders.set(data.streamId, {
+                        displayName: data.displayName || `送信側-${data.streamId}`,
+                        clientId: data.clientId
+                    });
+                    updateSenderList();
+                }
+                // 送信側情報の更新
+                else if (data.type === 'sender-info-updated') {
+                    console.log('送信側情報更新:', data.streamId, data.displayName);
+                    if (availableSenders.has(data.streamId)) {
+                        availableSenders.get(data.streamId).displayName = data.displayName;
+                        updateSenderList();
+                        
+                        // 既に接続している場合はラベルも更新
+                        const videoItem = document.getElementById(`stream-${data.streamId}`);
+                        if (videoItem) {
+                            const label = videoItem.querySelector('.video-label');
+                            if (label) {
+                                label.textContent = `${data.displayName} (ID: ${data.streamId})`;
+                            }
+                        }
+                    }
                 }
                 // Offerを受信
                 else if (data.type === 'webrtc-offer') {
@@ -251,17 +388,14 @@
                 else if (data.type === 'sender-disconnected') {
                     const streamId = data.streamId;
                     console.log(`送信側が切断しました (${streamId})`);
+                    availableSenders.delete(streamId);
+                    updateSenderList();
                     if (peerConnections[streamId]) {
                         peerConnections[streamId].close();
                         delete peerConnections[streamId];
                     }
                     removeStream(streamId);
                 }
-                peerConnections[streamId].close();
-                delete peerConnections[streamId];
-            }
-                    removeStream(streamId);
-        }
             } catch (error) {
             console.error('WebRTC接続エラー:', error);
             console.error('エラー詳細:', error.stack);

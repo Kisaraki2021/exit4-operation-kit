@@ -15,6 +15,26 @@
 
             <div class="connection-status" id="connection-status">接続中...</div>
 
+            <!-- HTTPS警告メッセージ -->
+            <div id="https-warning" style="display: none; background: #fff3cd; border: 2px solid #ffc107; border-radius: 8px; padding: 15px; margin: 15px 0; color: #856404;">
+                <strong>⚠️ 警告:</strong> HTTP接続が検出されました。<br>
+                iOSデバイスでカメラを使用するにはHTTPS接続が必要です。<br>
+                <small>現在のURL: <code id="current-url"></code></small>
+            </div>
+
+            <!-- 送信ID設定 -->
+            <div class="status-display">
+                <h2>送信側設定</h2>
+                <div class="status-item">
+                    <label for="sender-name" style="display: block; margin-bottom: 5px; font-weight: bold;">表示名:</label>
+                    <input type="text" id="sender-name" placeholder="例: カメラ1, 正面カメラ" style="width: 100%; padding: 10px; font-size: 16px; border: 2px solid #667eea; border-radius: 5px;" />
+                </div>
+                <div class="status-item" style="margin-top: 10px;">
+                    <span class="status-label">あなたのID:</span>
+                    <span class="status-value" id="my-stream-id" style="font-family: monospace; background: #f0f0f0; padding: 5px 10px; border-radius: 3px;">-</span>
+                </div>
+            </div>
+
             <div class="status-display">
                 <h2>カメラプレビュー</h2>
                 <div class="video-container">
@@ -63,11 +83,45 @@
         const streamStatus = document.getElementById('stream-status');
         const streamState = document.getElementById('stream-state');
         const cameraType = document.getElementById('camera-type');
+        const httpsWarning = document.getElementById('https-warning');
+        const currentUrlElement = document.getElementById('current-url');
+        const senderNameInput = document.getElementById('sender-name');
+        const myStreamIdElement = document.getElementById('my-stream-id');
+
+        // HTTPS状態チェック
+        if (window.location.protocol !== 'https:' && 
+            window.location.hostname !== 'localhost' && 
+            window.location.hostname !== '127.0.0.1') {
+            httpsWarning.style.display = 'block';
+            currentUrlElement.textContent = window.location.href;
+        }
 
         let localStream = null;
-        let peerConnections = {}; // streamId -> RTCPeerConnection
+        let peerConnections = {}; // receiverId -> RTCPeerConnection
         let currentFacingMode = 'user'; // 'user' = インカメラ, 'environment' = アウトカメラ
         let myStreamId = Math.random().toString(36).substr(2, 9); // このストリームのID
+
+        // ストリームIDを表示
+        myStreamIdElement.textContent = myStreamId;
+
+        // ローカルストレージから前回の表示名を復元
+        const savedName = localStorage.getItem('senderName');
+        if (savedName) {
+            senderNameInput.value = savedName;
+        }
+
+        // 表示名が変更されたら保存
+        senderNameInput.addEventListener('input', () => {
+            localStorage.setItem('senderName', senderNameInput.value);
+            // サーバーに更新を送信（接続中の場合）
+            if (wsClient.ws && wsClient.ws.readyState === WebSocket.OPEN) {
+                wsClient.send({
+                    type: 'update-sender-info',
+                    streamId: myStreamId,
+                    displayName: senderNameInput.value || `送信側-${myStreamId}`
+                });
+            }
+        });
 
         // 接続状態の表示
         wsClient.onStatusChange((isConnected) => {
@@ -78,7 +132,8 @@
                 wsClient.send({
                     type: 'register',
                     role: 'sender',
-                    streamId: myStreamId
+                    streamId: myStreamId,
+                    displayName: senderNameInput.value || `送信側-${myStreamId}`
                 });
             } else {
                 statusElement.textContent = '❌ サーバーに接続されていません';
@@ -89,6 +144,18 @@
         // カメラストリームを開始
         async function startCamera() {
             try {
+                // HTTPSチェック（iOSでは必須）
+                if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+                    alert('iOSデバイスではHTTPS接続が必要です。\nhttps:// でアクセスしてください。');
+                    return;
+                }
+
+                // getUserMediaのサポートチェック
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    alert('お使いのブラウザはカメラアクセスに対応していません。\n最新のブラウザをご使用ください。');
+                    return;
+                }
+
                 const constraints = {
                     video: {
                         facingMode: currentFacingMode,
@@ -115,7 +182,23 @@
 
             } catch (error) {
                 console.error('カメラアクセスエラー:', error);
-                alert('カメラにアクセスできませんでした。\n' + error.message);
+                let errorMessage = 'カメラにアクセスできませんでした。\n\n';
+                
+                if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+                    errorMessage += 'カメラの使用が許可されていません。\nブラウザの設定でカメラのアクセスを許可してください。';
+                } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+                    errorMessage += 'カメラが見つかりません。\nデバイスにカメラが接続されているか確認してください。';
+                } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
+                    errorMessage += 'カメラが他のアプリケーションで使用中の可能性があります。';
+                } else if (error.name === 'OverconstrainedError' || error.name === 'ConstraintNotSatisfiedError') {
+                    errorMessage += '指定されたカメラ設定がサポートされていません。';
+                } else if (error.name === 'TypeError') {
+                    errorMessage += 'HTTPS接続が必要です。\nhttps:// でアクセスしてください。';
+                } else {
+                    errorMessage += error.message;
+                }
+                
+                alert(errorMessage);
             }
         }
 

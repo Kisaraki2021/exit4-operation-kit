@@ -1,10 +1,30 @@
 const express = require('express');
 const http = require('http');
-const WebSocket = require('ws');
+const https = require('https');
+const fs = require('fs');
 const path = require('path');
+const WebSocket = require('ws');
 
 const app = express();
-const server = http.createServer(app);
+
+// SSL証明書の読み込み（存在する場合）
+let server;
+const sslKeyPath = path.join(__dirname, 'ssl', 'private.key');
+const sslCertPath = path.join(__dirname, 'ssl', 'certificate.crt');
+
+if (fs.existsSync(sslKeyPath) && fs.existsSync(sslCertPath)) {
+    const httpsOptions = {
+        key: fs.readFileSync(sslKeyPath),
+        cert: fs.readFileSync(sslCertPath)
+    };
+    server = https.createServer(httpsOptions, app);
+    console.log('✅ HTTPS モードで起動します');
+} else {
+    server = http.createServer(app);
+    console.log('⚠️  HTTP モードで起動します（iOS対応にはHTTPSが必要です）');
+    console.log('SSL証明書を生成するには: npm run generate-ssl または .\generate-ssl-cert.ps1');
+}
+
 const wss = new WebSocket.Server({ server });
 
 // 静的ファイルの提供
@@ -119,6 +139,7 @@ wss.on('connection', (ws) => {
     ws.clientId = Math.random().toString(36).substr(2, 9);
     ws.streamId = null; // ストリームID（送信側のみ設定）
     ws.role = null; // 'sender' または 'receiver'
+    ws.displayName = null; // 送信側の表示名
 
     // 接続時に現在の状態を送信
     const currentEventNumber = state.eventNumbers[state.count % state.eventNumbers.length];
@@ -176,26 +197,60 @@ wss.on('connection', (ws) => {
                     ws.role = data.role;
                     if (data.role === 'sender') {
                         ws.streamId = data.streamId || ws.clientId;
-                        console.log(`送信側登録: ${ws.streamId}`);
-                    } else if (data.role === 'receiver') {
-                        console.log(`受信側登録: ${ws.clientId}`);
-                        // 既存の送信側のリストを送信
-                        const senders = Array.from(wss.clients)
-                            .filter(c => c.role === 'sender' && c.readyState === WebSocket.OPEN)
-                            .map(c => ({ streamId: c.streamId, clientId: c.clientId }));
-                        ws.send(JSON.stringify({
-                            type: 'sender-list',
-                            senders: senders
-                        }));
-                    }
-                    // 受信側に新しい送信側を通知
-                    if (data.role === 'sender') {
+                        ws.displayName = data.displayName || `送信側-${ws.streamId}`;
+                        console.log(`送信側登録: ${ws.streamId} (${ws.displayName})`);
+                        
+                        // 既存の受信側に新しい送信側を通知
                         wss.clients.forEach((client) => {
                             if (client.role === 'receiver' && client.readyState === WebSocket.OPEN) {
                                 client.send(JSON.stringify({
                                     type: 'new-sender',
                                     streamId: ws.streamId,
-                                    clientId: ws.clientId
+                                    clientId: ws.clientId,
+                                    displayName: ws.displayName
+                                }));
+                            }
+                        });
+                    } else if (data.role === 'receiver') {
+                        console.log(`受信側登録: ${ws.clientId}`);
+                        // 受信側に自身のIDを通知
+                        ws.send(JSON.stringify({
+                            type: 'registered',
+                            role: 'receiver',
+                            clientId: ws.clientId
+                        }));
+                    }
+                    break;
+
+                // 送信側リストの要求
+                case 'request-sender-list':
+                    const senders = Array.from(wss.clients)
+                        .filter(c => c.role === 'sender' && c.readyState === WebSocket.OPEN)
+                        .map(c => ({ 
+                            streamId: c.streamId, 
+                            clientId: c.clientId,
+                            displayName: c.displayName || `送信側-${c.streamId}`
+                        }));
+                    ws.send(JSON.stringify({
+                        type: 'sender-list',
+                        senders: senders
+                    }));
+                    console.log(`送信側リストを送信: ${senders.length}件`);
+                    break;
+
+                // 送信側情報の更新
+                case 'update-sender-info':
+                    if (ws.role === 'sender') {
+                        ws.displayName = data.displayName || `送信側-${ws.streamId}`;
+                        console.log(`送信側情報更新: ${ws.streamId} -> ${ws.displayName}`);
+                        
+                        // 全受信側に更新を通知
+                        wss.clients.forEach((client) => {
+                            if (client.role === 'receiver' && client.readyState === WebSocket.OPEN) {
+                                client.send(JSON.stringify({
+                                    type: 'sender-info-updated',
+                                    streamId: ws.streamId,
+                                    displayName: ws.displayName
                                 }));
                             }
                         });
@@ -277,5 +332,14 @@ wss.on('connection', (ws) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-    console.log(`サーバーが起動しました: http://localhost:${PORT}`);
+    const protocol = server instanceof https.Server ? 'https' : 'http';
+    console.log(`サーバーが起動しました: ${protocol}://localhost:${PORT}`);
+    console.log('');
+    if (protocol === 'http') {
+        console.log('📱 iOSデバイスでカメラを使用する場合:');
+        console.log('   1. SSL証明書を生成: .\\generate-ssl-cert.ps1');
+        console.log('   2. nginxでHTTPSリバースプロキシを設定');
+        console.log('   または');
+        console.log('   3. ngrokなどのトンネリングサービスを使用');
+    }
 });
