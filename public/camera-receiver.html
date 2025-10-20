@@ -207,7 +207,17 @@
             const video = document.createElement('video');
             video.autoplay = true;
             video.playsinline = true;
+            video.muted = false; // ミュートを解除
             video.srcObject = stream;
+            
+            console.log(`ビデオ要素を作成: autoplay=${video.autoplay}, playsinline=${video.playsinline}`);
+            console.log(`ストリームのアクティブトラック:`, stream.getTracks().map(t => `${t.kind}:${t.readyState}`));
+
+            // ビデオの再生を確実にするためのイベントリスナー
+            video.addEventListener('loadedmetadata', () => {
+                console.log(`ビデオメタデータ読み込み完了 (${streamId})`);
+                video.play().catch(e => console.error('ビデオ再生エラー:', e));
+            });
 
             videoItem.appendChild(label);
             videoItem.appendChild(video);
@@ -329,9 +339,13 @@
 
                     // リモートストリームを受信
                     peerConnection.ontrack = (event) => {
-                        console.log(`トラックを受信 (${streamId}):`, event.streams[0]);
+                        console.log(`トラックを受信 (${streamId}):`, event.track.kind, event.track.id);
+                        console.log('ストリーム:', event.streams);
                         if (event.streams && event.streams[0]) {
+                            console.log(`ストリームのトラック数: ${event.streams[0].getTracks().length}`);
                             addRemoteStream(event.streams[0], streamId);
+                        } else {
+                            console.error('ストリームが見つかりません!');
                         }
                     };
 
