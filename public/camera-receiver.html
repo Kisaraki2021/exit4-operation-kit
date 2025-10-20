@@ -186,9 +186,16 @@
 
         // リモートストリームを表示
         function addRemoteStream(stream, streamId) {
-            // 既に表示されている場合はスキップ
-            if (document.getElementById(`stream-${streamId}`)) {
-                console.log(`ストリーム ${streamId} は既に表示されています`);
+            // 既に表示されている場合は、ビデオ要素のストリームを更新
+            const existingVideoItem = document.getElementById(`stream-${streamId}`);
+            if (existingVideoItem) {
+                console.log(`ストリーム ${streamId} は既に表示されています - ストリームを更新`);
+                const video = existingVideoItem.querySelector('video');
+                if (video && video.srcObject !== stream) {
+                    video.srcObject = stream;
+                    console.log(`ビデオ要素のストリームを更新しました (${streamId})`);
+                    console.log(`更新後のトラック:`, stream.getTracks().map(t => `${t.kind}:${t.readyState}`));
+                }
                 return;
             }
 
