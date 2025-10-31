@@ -220,6 +220,7 @@ wss.on('connection', (ws) => {
 
                 case 'reset':
                     // すべてをリセット
+                    console.log('Reset message received');
                     state.count = 0;
                     state.progress = 0;
                     state.staffStatus = false;
@@ -231,6 +232,7 @@ wss.on('connection', (ws) => {
                     broadcastState();
                     broadcastTimer(currentTimerSeconds);
                     broadcastTimerStatus();
+                    console.log('Reset completed, state broadcasted');
                     break;
 
                 case 'pauseTimer':

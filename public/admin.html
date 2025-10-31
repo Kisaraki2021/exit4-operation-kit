@@ -22,26 +22,26 @@
                     <span class="status-value" id="count-display">0</span>
                 </div>
                 <div class="status-item">
-                    <span class="status-label">進行度合:</span>
+                    <span class="status-label">いま何番出口？:</span>
                     <span class="status-value" id="progress-display">0</span>
                 </div>
                 <div class="status-item">
-                    <span class="status-label">イベントナンバー:</span>
+                    <span class="status-label">異変番号:</span>
                     <span class="status-value" id="event-number-display">-</span>
                 </div>
                 <div class="status-item">
-                    <span class="status-label">スタッフ指示:</span>
+                    <span class="status-label">異変変更作業終わっているか？:</span>
                     <span class="status-value" id="staff-status-display">作業中</span>
                 </div>
                 <div class="status-item">
-                    <span class="status-label">進行可:</span>
+                    <span class="status-label">進行可否:</span>
                     <span class="status-value" id="can-proceed-display">〇</span>
                 </div>
             </div>
 
             <div class="button-group">
                 <button class="btn btn-primary btn-large" id="increment-count-btn" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); font-size: 1.3em;">
-                    ➕ 回数を増やす
+                    ➕ 次のステージへ進む
                 </button>
             </div>
 
@@ -49,9 +49,10 @@
                 <button class="btn btn-success btn-large" id="increase-btn">
                     ⬆️ 正解
                 </button>
+                <!---
                 <button class="btn btn-warning btn-large" id="no-increase-btn">
                     ⏸️ 不正解
-                </button>
+                </button> --->
             </div>
 
             <div class="button-group">
@@ -167,10 +168,16 @@
 
         // リセットボタン
         resetBtn.addEventListener('click', () => {
+            console.log('Reset button clicked');
             if (confirm('本当に全てをリセットしますか?')) {
+                console.log('Reset confirmed, sending message');
                 wsClient.send({ type: 'reset' });
                 increaseBtn.style.opacity = '1';
                 noIncreaseBtn.style.opacity = '1';
+                proceedOkBtn.style.opacity = '1';
+                proceedNgBtn.style.opacity = '1';
+            } else {
+                console.log('Reset cancelled');
             }
         });
     </script>
