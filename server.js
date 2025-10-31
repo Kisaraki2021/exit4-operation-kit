@@ -193,13 +193,6 @@ wss.on('connection', (ws) => {
         },
     }));
 
-    ws.send(JSON.stringify({
-        type: 'timer-status',
-        data: {
-            isPaused: isTimerPaused
-        }
-    }));
-
     // メッセージ受信
     ws.on('message', (message) => {
         try {
@@ -225,22 +218,8 @@ wss.on('connection', (ws) => {
                     state.shouldIncreaseProgress = false;
                     initializeEventNumbers();
                     currentTimerSeconds = 30;
-                    isTimerPaused = false;
                     broadcastState();
                     broadcastTimer(currentTimerSeconds);
-                    broadcastTimerStatus();
-                    break;
-
-                case 'pauseTimer':
-                    // タイマーを一時停止
-                    pauseTimer();
-                    broadcastTimerStatus();
-                    break;
-
-                case 'resumeTimer':
-                    // タイマーを再開
-                    resumeTimer();
-                    broadcastTimerStatus();
                     break;
 
                 // クライアント登録（送信側/受信側の識別）
