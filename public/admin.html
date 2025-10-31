@@ -98,10 +98,10 @@
         const canProceedDisplay = document.getElementById('can-proceed-display');
         const incrementCountBtn = document.getElementById('increment-count-btn');
         const increaseBtn = document.getElementById('increase-btn');
-        const noIncreaseBtn = document.getElementById('no-increase-btn');
+        // const noIncreaseBtn = document.getElementById('no-increase-btn'); // コメントアウトされたボタン
         const resetBtn = document.getElementById('reset-btn');
-        const pauseTimerBtn = document.getElementById('pause-timer-btn');
-        const resumeTimerBtn = document.getElementById('resume-timer-btn');
+        // const pauseTimerBtn = document.getElementById('pause-timer-btn'); // コメントアウトされたボタン
+        // const resumeTimerBtn = document.getElementById('resume-timer-btn'); // コメントアウトされたボタン
         const proceedOkBtn = document.getElementById('proceed-ok-btn');
         const proceedNgBtn = document.getElementById('proceed-ng-btn');
 
@@ -140,17 +140,17 @@
         increaseBtn.addEventListener('click', () => {
             wsClient.send({ type: 'setProgressIncrease', value: true });
             increaseBtn.style.opacity = '1';
-            noIncreaseBtn.style.opacity = '0.5';
+            // noIncreaseBtn.style.opacity = '0.5'; // ボタンがコメントアウトされているため無効化
             alert('次の回数更新時に進行度合が増えます');
         });
 
-        // 進行度合を増やさないボタン
-        noIncreaseBtn.addEventListener('click', () => {
-            wsClient.send({ type: 'setProgressIncrease', value: false });
-            increaseBtn.style.opacity = '0.5';
-            noIncreaseBtn.style.opacity = '1';
-            alert('次の回数更新時に進行度合は増えません');
-        });
+        // 進行度合を増やさないボタン (コメントアウトされているため無効化)
+        // noIncreaseBtn.addEventListener('click', () => {
+        //     wsClient.send({ type: 'setProgressIncrease', value: false });
+        //     increaseBtn.style.opacity = '0.5';
+        //     noIncreaseBtn.style.opacity = '1';
+        //     alert('次の回数更新時に進行度合は増えません');
+        // });
 
         // 進行可ボタン
         proceedOkBtn.addEventListener('click', () => {
@@ -173,7 +173,7 @@
                 console.log('Reset confirmed, sending message');
                 wsClient.send({ type: 'reset' });
                 increaseBtn.style.opacity = '1';
-                noIncreaseBtn.style.opacity = '1';
+                // noIncreaseBtn.style.opacity = '1'; // ボタンがコメントアウトされているため無効化
                 proceedOkBtn.style.opacity = '1';
                 proceedNgBtn.style.opacity = '1';
             } else {
