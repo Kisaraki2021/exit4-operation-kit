@@ -112,23 +112,8 @@ function startTimer() {
             broadcastTimer(currentTimerSeconds);
 
             if (currentTimerSeconds <= 0) {
-                // 回数を増やす
-                state.count++;
-
-                // 進行度合を増やすかチェック
-                if (state.shouldIncreaseProgress) {
-                    state.progress++;
-                    state.shouldIncreaseProgress = false;
-                }
-
-                // スタッフ指示ステータスをリセット
-                state.staffStatus = false;
-
-                // タイマーをリセット
+                // タイマーをリセット（回数は自動増加しない）
                 currentTimerSeconds = 30;
-
-                // 状態をブロードキャスト
-                broadcastState();
             }
         }
     }, 1000);
@@ -222,6 +207,22 @@ wss.on('connection', (ws) => {
                 case 'setCanProceed':
                     // 進行可ステータスを更新
                     state.canProceed = data.value;
+                    broadcastState();
+                    break;
+
+                case 'incrementCount':
+                    // 回数を手動で増やす
+                    state.count++;
+                    
+                    // 進行度合を増やすかチェック
+                    if (state.shouldIncreaseProgress) {
+                        state.progress++;
+                        state.shouldIncreaseProgress = false;
+                    }
+                    
+                    // スタッフ指示ステータスをリセット
+                    state.staffStatus = false;
+                    
                     broadcastState();
                     break;
 

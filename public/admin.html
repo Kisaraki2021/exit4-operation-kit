@@ -37,10 +37,12 @@
                     <span class="status-label">進行可:</span>
                     <span class="status-value" id="can-proceed-display">〇</span>
                 </div>
-                <div class="status-item">
-                    <span class="status-label">次回更新まで:</span>
-                    <span class="status-value" id="timer-display">30</span> 秒
-                </div>
+            </div>
+
+            <div class="button-group">
+                <button class="btn btn-primary btn-large" id="increment-count-btn" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); font-size: 1.3em;">
+                    ➕ 回数を増やす
+                </button>
             </div>
 
             <div class="button-group">
@@ -93,6 +95,7 @@
         const staffStatusDisplay = document.getElementById('staff-status-display');
         const timerDisplay = document.getElementById('timer-display');
         const canProceedDisplay = document.getElementById('can-proceed-display');
+        const incrementCountBtn = document.getElementById('increment-count-btn');
         const increaseBtn = document.getElementById('increase-btn');
         const noIncreaseBtn = document.getElementById('no-increase-btn');
         const resetBtn = document.getElementById('reset-btn');
@@ -122,25 +125,15 @@
                 staffStatusDisplay.style.color = data.data.staffStatus ? '#56ab2f' : '#f2994a';
                 canProceedDisplay.textContent = data.data.canProceed ? '〇' : '✕';
                 canProceedDisplay.style.color = data.data.canProceed ? '#56ab2f' : '#e74c3c';
-            } else if (data.type === 'timer') {
-                timerDisplay.textContent = data.data.remainingSeconds;
-            } else if (data.type === 'timer-status') {
-                updateTimerButtonState(data.data.isPaused);
             }
         });
 
-        // タイマーボタンの状態を更新
-        function updateTimerButtonState(isPaused) {
-            if (isPaused) {
-                pauseTimerBtn.style.display = 'none';
-                resumeTimerBtn.style.display = 'inline-block';
-                timerDisplay.parentElement.style.background = '#ffe0e0';
-            } else {
-                pauseTimerBtn.style.display = 'inline-block';
-                resumeTimerBtn.style.display = 'none';
-                timerDisplay.parentElement.style.background = '';
+        // 回数を増やすボタン
+        incrementCountBtn.addEventListener('click', () => {
+            if (confirm('回数を増やしますか？')) {
+                wsClient.send({ type: 'incrementCount' });
             }
-        }
+        });
 
         // 進行度合を増やすボタン
         increaseBtn.addEventListener('click', () => {
@@ -171,22 +164,6 @@
             proceedOkBtn.style.opacity = '0.5';
             proceedNgBtn.style.opacity = '1';
         });
-
-        // タイマー一時停止ボタン
-        if (pauseTimerBtn) {
-            pauseTimerBtn.addEventListener('click', () => {
-                if (confirm('タイマーを一時停止しますか?')) {
-                    wsClient.send({ type: 'pauseTimer' });
-                }
-            });
-        }
-
-        // タイマー再開ボタン
-        if (resumeTimerBtn) {
-            resumeTimerBtn.addEventListener('click', () => {
-                wsClient.send({ type: 'resumeTimer' });
-            });
-        }
 
         // リセットボタン
         resetBtn.addEventListener('click', () => {
