@@ -15,6 +15,16 @@
 
             <div class="status-display">
                 <div class="status-item">
+                    <span class="status-label">イベントナンバー:</span>
+                </div>
+                <div style="text-align: center; margin: 20px 0;">
+                    <img id="event-image" src="/image/1.png" alt="イベント画像" style="max-width: 80%; height: auto; border-radius: 10px; box-shadow: 0 5px 15px rgba(0,0,0,0.3);">
+                </div>
+                <div class="event-number-display" id="event-number-display">1</div>
+            </div>
+
+            <div class="status-display">
+                <div class="status-item">
                     <span class="status-label">現在の進行度合:</span>
                 </div>
                 <div class="progress-display" id="progress-display">0</div>
@@ -38,11 +48,17 @@
 
     <script src="/js/websocket.js"></script>
     <script>
+        const eventNumberDisplay = document.getElementById('event-number-display');
+        const eventImage = document.getElementById('event-image');
         const progressDisplay = document.getElementById('progress-display');
         const timerDisplay = document.getElementById('timer-display');
 
         wsClient.onMessage((data) => {
             if (data.type === 'state') {
+                const eventNumber = data.data.currentEventNumber;
+                eventNumberDisplay.textContent = eventNumber;
+                eventImage.src = `/image/${eventNumber}.png`;
+                eventImage.alt = `イベント ${eventNumber}`;
                 progressDisplay.textContent = data.data.progress;
             } else if (data.type === 'timer') {
                 timerDisplay.textContent = data.data.remainingSeconds;

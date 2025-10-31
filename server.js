@@ -34,24 +34,16 @@ app.use(express.static('public'));
 const state = {
     count: 0,              // 回数
     progress: 0,           // 進行度合
-    eventNumbers: [],      // イベントナンバー配列
+    eventNumbers: [1, 2, 3, 4, 5, 6], // イベントナンバー固定配列
     staffStatus: false,    // スタッフ指示ステータス
     shouldIncreaseProgress: false, // 進行度合を増やすかどうか
     canProceed: true,      // 進行可ステータス（〇: true, ✕: false）
 };
 
-// イベントナンバー配列を初期化（1-20をシャッフル）
+// イベントナンバー配列を初期化（固定値）
 function initializeEventNumbers() {
-    state.eventNumbers = Array.from({ length: 20 }, (_, i) => i + 1);
-    // Fisher-Yatesシャッフル
-    for (let i = state.eventNumbers.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [state.eventNumbers[i], state.eventNumbers[j]] = [state.eventNumbers[j], state.eventNumbers[i]];
-    }
+    state.eventNumbers = [1, 2, 3, 4, 5, 6];
 }
-
-// 初期化
-initializeEventNumbers();
 
 // 全クライアントに状態を送信
 function broadcastState() {
