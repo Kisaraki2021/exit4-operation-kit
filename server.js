@@ -37,6 +37,7 @@ const state = {
     eventNumbers: [],      // イベントナンバー配列
     staffStatus: false,    // スタッフ指示ステータス
     shouldIncreaseProgress: false, // 進行度合を増やすかどうか
+    canProceed: true,      // 進行可ステータス（〇: true, ✕: false）
 };
 
 // イベントナンバー配列を初期化（1-20をシャッフル）
@@ -65,6 +66,7 @@ function broadcastState() {
             currentEventNumber,
             nextEventNumber,
             staffStatus: state.staffStatus,
+            canProceed: state.canProceed,
         },
     });
 
@@ -217,12 +219,19 @@ wss.on('connection', (ws) => {
                     broadcastState();
                     break;
 
+                case 'setCanProceed':
+                    // 進行可ステータスを更新
+                    state.canProceed = data.value;
+                    broadcastState();
+                    break;
+
                 case 'reset':
                     // すべてをリセット
                     state.count = 0;
                     state.progress = 0;
                     state.staffStatus = false;
                     state.shouldIncreaseProgress = false;
+                    state.canProceed = true;
                     initializeEventNumbers();
                     currentTimerSeconds = 30;
                     isTimerPaused = false;

@@ -34,6 +34,10 @@
                     <span class="status-value" id="staff-status-display">作業中</span>
                 </div>
                 <div class="status-item">
+                    <span class="status-label">進行可:</span>
+                    <span class="status-value" id="can-proceed-display">〇</span>
+                </div>
+                <div class="status-item">
                     <span class="status-label">次回更新まで:</span>
                     <span class="status-value" id="timer-display">30</span> 秒
                 </div>
@@ -41,25 +45,34 @@
 
             <div class="button-group">
                 <button class="btn btn-success btn-large" id="increase-btn">
-                    ⬆️ 進行度合を増やす
+                    ⬆️ 正解
                 </button>
                 <button class="btn btn-warning btn-large" id="no-increase-btn">
-                    ⏸️ 進行度合を増やさない
+                    ⏸️ 不正解
                 </button>
             </div>
 
             <div class="button-group">
+                <button class="btn btn-success btn-large" id="proceed-ok-btn">
+                    ⭕ 進行可
+                </button>
+                <button class="btn btn-danger btn-large" id="proceed-ng-btn">
+                    ❌ 進行不可
+                </button>
+            </div>
+
+<!---       <div class="button-group">
                 <button class="btn btn-large" id="pause-timer-btn" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
                     ⏸️ タイマーを一時停止
                 </button>
                 <button class="btn btn-large" id="resume-timer-btn" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); display: none;">
                     ▶️ タイマーを再開
                 </button>
-            </div>
+            </div> --->
 
             <div class="button-group">
                 <button class="btn btn-danger btn-large" id="reset-btn">
-                    🔄 全てをリセット
+                    🔄 ゲームの状況をリセット
                 </button>
             </div>
 
@@ -79,11 +92,14 @@
         const eventNumberDisplay = document.getElementById('event-number-display');
         const staffStatusDisplay = document.getElementById('staff-status-display');
         const timerDisplay = document.getElementById('timer-display');
+        const canProceedDisplay = document.getElementById('can-proceed-display');
         const increaseBtn = document.getElementById('increase-btn');
         const noIncreaseBtn = document.getElementById('no-increase-btn');
         const resetBtn = document.getElementById('reset-btn');
         const pauseTimerBtn = document.getElementById('pause-timer-btn');
         const resumeTimerBtn = document.getElementById('resume-timer-btn');
+        const proceedOkBtn = document.getElementById('proceed-ok-btn');
+        const proceedNgBtn = document.getElementById('proceed-ng-btn');
 
         // 接続状態の表示
         wsClient.onStatusChange((isConnected) => {
@@ -104,6 +120,8 @@
                 eventNumberDisplay.textContent = data.data.currentEventNumber;
                 staffStatusDisplay.textContent = data.data.staffStatus ? '完了' : '作業中';
                 staffStatusDisplay.style.color = data.data.staffStatus ? '#56ab2f' : '#f2994a';
+                canProceedDisplay.textContent = data.data.canProceed ? '〇' : '✕';
+                canProceedDisplay.style.color = data.data.canProceed ? '#56ab2f' : '#e74c3c';
             } else if (data.type === 'timer') {
                 timerDisplay.textContent = data.data.remainingSeconds;
             } else if (data.type === 'timer-status') {
@@ -140,17 +158,35 @@
             alert('次の回数更新時に進行度合は増えません');
         });
 
-        // タイマー一時停止ボタン
-        pauseTimerBtn.addEventListener('click', () => {
-            if (confirm('タイマーを一時停止しますか?')) {
-                wsClient.send({ type: 'pauseTimer' });
-            }
+        // 進行可ボタン
+        proceedOkBtn.addEventListener('click', () => {
+            wsClient.send({ type: 'setCanProceed', value: true });
+            proceedOkBtn.style.opacity = '1';
+            proceedNgBtn.style.opacity = '0.5';
         });
 
-        // タイマー再開ボタン
-        resumeTimerBtn.addEventListener('click', () => {
-            wsClient.send({ type: 'resumeTimer' });
+        // 進行不可ボタン
+        proceedNgBtn.addEventListener('click', () => {
+            wsClient.send({ type: 'setCanProceed', value: false });
+            proceedOkBtn.style.opacity = '0.5';
+            proceedNgBtn.style.opacity = '1';
         });
+
+        // タイマー一時停止ボタン
+        if (pauseTimerBtn) {
+            pauseTimerBtn.addEventListener('click', () => {
+                if (confirm('タイマーを一時停止しますか?')) {
+                    wsClient.send({ type: 'pauseTimer' });
+                }
+            });
+        }
+
+        // タイマー再開ボタン
+        if (resumeTimerBtn) {
+            resumeTimerBtn.addEventListener('click', () => {
+                wsClient.send({ type: 'resumeTimer' });
+            });
+        }
 
         // リセットボタン
         resetBtn.addEventListener('click', () => {

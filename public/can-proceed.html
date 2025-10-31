@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>進行可ステータス - 4番出口</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        body {
+            background: #2c3e50;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 0;
+        }
+        
+        .status-container {
+            text-align: center;
+            padding: 40px;
+        }
+        
+        .status-symbol {
+            font-size: 20em;
+            font-weight: bold;
+            margin: 0;
+            line-height: 1;
+            transition: all 0.3s ease;
+        }
+        
+        .status-ok {
+            color: #2ecc71;
+            text-shadow: 0 0 30px rgba(46, 204, 113, 0.5);
+        }
+        
+        .status-ng {
+            color: #e74c3c;
+            text-shadow: 0 0 30px rgba(231, 76, 60, 0.5);
+        }
+        
+        .status-text {
+            font-size: 3em;
+            margin-top: 20px;
+            color: white;
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="status-container">
+        <div class="status-symbol" id="status-symbol">〇</div>
+        <div class="status-text" id="status-text">進行可</div>
+    </div>
+
+    <script src="/js/websocket.js"></script>
+    <script>
+        const statusSymbol = document.getElementById('status-symbol');
+        const statusText = document.getElementById('status-text');
+
+        // メッセージ受信
+        wsClient.onMessage((data) => {
+            if (data.type === 'state') {
+                if (data.data.canProceed) {
+                    statusSymbol.textContent = '〇';
+                    statusSymbol.className = 'status-symbol status-ok';
+                    statusText.textContent = '進行可';
+                    statusText.style.color = '#2ecc71';
+                } else {
+                    statusSymbol.textContent = '✕';
+                    statusSymbol.className = 'status-symbol status-ng';
+                    statusText.textContent = '進行不可';
+                    statusText.style.color = '#e74c3c';
+                }
+            }
+        });
+    </script>
+</body>
+
+</html>
