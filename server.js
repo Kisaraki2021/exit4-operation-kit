@@ -93,7 +93,8 @@ function broadcastTimer(remainingSeconds) {
 
 // 30秒タイマー
 let timerInterval;
-let currentTimerSeconds = 30;
+let currentTimerSeconds = 20;
+let isTimerPaused = false;
 
 function startTimer() {
     if (timerInterval) {
@@ -101,31 +102,60 @@ function startTimer() {
     }
 
     currentTimerSeconds = 30;
+    isTimerPaused = false;
 
     timerInterval = setInterval(() => {
-        currentTimerSeconds--;
-        broadcastTimer(currentTimerSeconds);
+        if (!isTimerPaused) {
+            currentTimerSeconds--;
+            broadcastTimer(currentTimerSeconds);
 
-        if (currentTimerSeconds <= 0) {
-            // 回数を増やす
-            state.count++;
+            if (currentTimerSeconds <= 0) {
+                // 回数を増やす
+                state.count++;
 
-            // 進行度合を増やすかチェック
-            if (state.shouldIncreaseProgress) {
-                state.progress++;
-                state.shouldIncreaseProgress = false;
+                // 進行度合を増やすかチェック
+                if (state.shouldIncreaseProgress) {
+                    state.progress++;
+                    state.shouldIncreaseProgress = false;
+                }
+
+                // スタッフ指示ステータスをリセット
+                state.staffStatus = false;
+
+                // タイマーをリセット
+                currentTimerSeconds = 30;
+
+                // 状態をブロードキャスト
+                broadcastState();
             }
-
-            // スタッフ指示ステータスをリセット
-            state.staffStatus = false;
-
-            // タイマーをリセット
-            currentTimerSeconds = 30;
-
-            // 状態をブロードキャスト
-            broadcastState();
         }
     }, 1000);
+}
+
+function pauseTimer() {
+    isTimerPaused = true;
+    console.log('タイマーを一時停止しました');
+}
+
+function resumeTimer() {
+    isTimerPaused = false;
+    console.log('タイマーを再開しました');
+}
+
+// タイマー状態をブロードキャスト
+function broadcastTimerStatus() {
+    const message = JSON.stringify({
+        type: 'timer-status',
+        data: {
+            isPaused: isTimerPaused
+        }
+    });
+
+    wss.clients.forEach((client) => {
+        if (client.readyState === WebSocket.OPEN) {
+            client.send(message);
+        }
+    });
 }
 
 // タイマー開始
@@ -163,6 +193,13 @@ wss.on('connection', (ws) => {
         },
     }));
 
+    ws.send(JSON.stringify({
+        type: 'timer-status',
+        data: {
+            isPaused: isTimerPaused
+        }
+    }));
+
     // メッセージ受信
     ws.on('message', (message) => {
         try {
@@ -188,8 +225,22 @@ wss.on('connection', (ws) => {
                     state.shouldIncreaseProgress = false;
                     initializeEventNumbers();
                     currentTimerSeconds = 30;
+                    isTimerPaused = false;
                     broadcastState();
                     broadcastTimer(currentTimerSeconds);
+                    broadcastTimerStatus();
+                    break;
+
+                case 'pauseTimer':
+                    // タイマーを一時停止
+                    pauseTimer();
+                    broadcastTimerStatus();
+                    break;
+
+                case 'resumeTimer':
+                    // タイマーを再開
+                    resumeTimer();
+                    broadcastTimerStatus();
                     break;
 
                 // クライアント登録（送信側/受信側の識別）

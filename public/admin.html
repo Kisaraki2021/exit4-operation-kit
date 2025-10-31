@@ -49,6 +49,15 @@
             </div>
 
             <div class="button-group">
+                <button class="btn btn-large" id="pause-timer-btn" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                    ⏸️ タイマーを一時停止
+                </button>
+                <button class="btn btn-large" id="resume-timer-btn" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); display: none;">
+                    ▶️ タイマーを再開
+                </button>
+            </div>
+
+            <div class="button-group">
                 <button class="btn btn-danger btn-large" id="reset-btn">
                     🔄 全てをリセット
                 </button>
@@ -73,6 +82,8 @@
         const increaseBtn = document.getElementById('increase-btn');
         const noIncreaseBtn = document.getElementById('no-increase-btn');
         const resetBtn = document.getElementById('reset-btn');
+        const pauseTimerBtn = document.getElementById('pause-timer-btn');
+        const resumeTimerBtn = document.getElementById('resume-timer-btn');
 
         // 接続状態の表示
         wsClient.onStatusChange((isConnected) => {
@@ -95,8 +106,23 @@
                 staffStatusDisplay.style.color = data.data.staffStatus ? '#56ab2f' : '#f2994a';
             } else if (data.type === 'timer') {
                 timerDisplay.textContent = data.data.remainingSeconds;
+            } else if (data.type === 'timer-status') {
+                updateTimerButtonState(data.data.isPaused);
             }
         });
+
+        // タイマーボタンの状態を更新
+        function updateTimerButtonState(isPaused) {
+            if (isPaused) {
+                pauseTimerBtn.style.display = 'none';
+                resumeTimerBtn.style.display = 'inline-block';
+                timerDisplay.parentElement.style.background = '#ffe0e0';
+            } else {
+                pauseTimerBtn.style.display = 'inline-block';
+                resumeTimerBtn.style.display = 'none';
+                timerDisplay.parentElement.style.background = '';
+            }
+        }
 
         // 進行度合を増やすボタン
         increaseBtn.addEventListener('click', () => {
@@ -112,6 +138,18 @@
             increaseBtn.style.opacity = '0.5';
             noIncreaseBtn.style.opacity = '1';
             alert('次の回数更新時に進行度合は増えません');
+        });
+
+        // タイマー一時停止ボタン
+        pauseTimerBtn.addEventListener('click', () => {
+            if (confirm('タイマーを一時停止しますか?')) {
+                wsClient.send({ type: 'pauseTimer' });
+            }
+        });
+
+        // タイマー再開ボタン
+        resumeTimerBtn.addEventListener('click', () => {
+            wsClient.send({ type: 'resumeTimer' });
         });
 
         // リセットボタン
