@@ -241,7 +241,9 @@
                 });
 
                 // ローカルストリームを追加
+                console.log(`ローカルストリームのトラック数: ${localStream.getTracks().length}`);
                 localStream.getTracks().forEach(track => {
+                    console.log(`トラックを追加: ${track.kind} (${track.id})`);
                     peerConnection.addTrack(track, localStream);
                 });
 
