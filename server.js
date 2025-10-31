@@ -93,7 +93,7 @@ function broadcastTimer(remainingSeconds) {
 
 // 30秒タイマー
 let timerInterval;
-let currentTimerSeconds = 20;
+let currentTimerSeconds = 30;
 let isTimerPaused = false;
 
 function startTimer() {
